@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#07070f">
+<title>Depotoverblik</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  :root {
+    --bg:#07070f;--surface:rgba(255,255,255,0.04);--surface2:rgba(255,255,255,0.07);
+    --border:rgba(255,255,255,0.09);--text:#f1f5f9;--muted:#64748b;--dim:#334155;
+    --indigo:#6366f1;--indigo-soft:rgba(99,102,241,0.15);
+    --blue:#3b82f6;--cyan:#22d3ee;--purple:#a78bfa;--amber:#f59e0b;
+    --green:#10b981;--red:#ef4444;--orange:#f97316;
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;min-height:100vh;overflow-x:hidden}
+  #upload-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;gap:32px}
+  .logo-mark{width:64px;height:64px;background:linear-gradient(135deg,var(--indigo),var(--purple));border-radius:18px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:28px;font-weight:800;box-shadow:0 0 40px rgba(99,102,241,0.4)}
+  .upload-title{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;text-align:center;line-height:1.2;letter-spacing:-0.02em}
+  .upload-sub{font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+  .drop-zone{width:100%;max-width:380px;border:2px dashed rgba(99,102,241,0.4);border-radius:20px;padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;cursor:pointer;transition:all 0.2s;background:var(--indigo-soft);position:relative}
+  .drop-zone.drag-over{border-color:var(--indigo);background:rgba(99,102,241,0.2);transform:scale(1.02)}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .drop-icon{font-size:40px}.drop-text{font-size:13px;font-weight:600;color:var(--text);text-align:center}
+  .drop-hint{font-size:11px;color:var(--muted);text-align:center}
+  .upload-note{font-size:11px;color:var(--dim);text-align:center;max-width:320px;line-height:1.6}
+  #app{display:none;flex-direction:column;min-height:100vh}
+  .header{position:sticky;top:0;z-index:100;background:rgba(7,7,15,0.95);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:14px 16px 0}
+  .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .header-logo{display:flex;align-items:center;gap:10px}
+  .header-mark{width:30px;height:30px;background:linear-gradient(135deg,var(--indigo),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:13px;font-weight:800}
+  .header-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700}
+  .header-date{font-size:9px;color:var(--muted);margin-top:1px}
+  .header-value{text-align:right}
+  .header-value .big{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+  .header-value .small{font-size:9px;color:var(--muted)}
+  .tabs{display:flex;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab-btn{flex-shrink:0;background:none;border:none;color:var(--muted);padding:10px 14px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap}
+  .tab-btn.active{color:#818cf8;border-bottom-color:var(--indigo);background:rgba(99,102,241,0.08)}
+  .content{padding:16px;padding-bottom:calc(16px + var(--safe-bottom));flex:1}
+  .seg-filter{display:flex;gap:6px;margin-bottom:14px;padding:4px;background:rgba(255,255,255,0.04);border-radius:12px}
+  .seg-btn{flex:1;background:none;border:none;color:var(--muted);padding:8px 4px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;border-radius:8px;transition:all 0.15s;text-align:center}
+  .seg-btn.active{background:var(--indigo);color:#fff;box-shadow:0 0 12px rgba(99,102,241,0.4)}
+  .seg-btn.active.pension{background:var(--purple);box-shadow:0 0 12px rgba(167,139,250,0.4)}
+  .seg-btn.active.fri{background:var(--blue);box-shadow:0 0 12px rgba(59,130,246,0.4)}
+  .seg-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:600;margin-bottom:12px}
+  .seg-badge.pension{background:rgba(167,139,250,0.15);color:var(--purple);border:1px solid rgba(167,139,250,0.3)}
+  .seg-badge.fri{background:rgba(59,130,246,0.15);color:var(--blue);border:1px solid rgba(59,130,246,0.3)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+  .card-title{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card-title::before{content:'';display:block;width:3px;height:14px;background:var(--indigo);border-radius:2px;flex-shrink:0}
+  .card-sub{font-size:10px;color:var(--dim);margin-top:-10px;margin-bottom:14px;line-height:1.5}
+  .badge{font-size:10px;background:var(--indigo-soft);color:#818cf8;padding:2px 8px;border-radius:20px;margin-left:auto}
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .kpi-grid.three{grid-template-columns:1fr 1fr 1fr}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 12px 12px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;border-radius:12px 0 0 12px;background:var(--accent,var(--indigo))}
+  .kpi-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;padding-left:6px}
+  .kpi-value{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;padding-left:6px;line-height:1.1}
+  .kpi-sub{font-size:10px;color:var(--muted);margin-top:3px;padding-left:6px}
+  .ai-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .ai-bar-name{font-size:11px;color:var(--text);width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ai-bar-wrap{flex:1;display:flex;flex-direction:column;gap:3px}
+  .ai-bar-track{height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;display:flex}
+  .ai-bar-direct{height:100%;background:var(--amber);transition:width 0.6s}
+  .ai-bar-indirect{height:100%;background:rgba(245,158,11,0.35);transition:width 0.6s}
+  .ai-bar-labels{display:flex;gap:8px;font-size:9px}
+  .ai-bar-total{font-size:11px;font-weight:600;color:var(--text);width:55px;text-align:right;flex-shrink:0}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tbl{width:100%;border-collapse:collapse;min-width:420px}
+  .tbl th{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;padding:10px 8px;text-align:left;border-bottom:1px solid var(--border);background:rgba(99,102,241,0.04);white-space:nowrap}
+  .tbl th.r{text-align:right}
+  .tbl td{font-size:11px;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle}
+  .tbl td.r{text-align:right}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tr.total td{border-top:1px solid rgba(245,158,11,0.25);background:rgba(245,158,11,0.04);font-weight:700;color:var(--amber);border-bottom:none}
+  .rank{width:22px;height:22px;border-radius:6px;background:var(--indigo-soft);color:#818cf8;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:600;flex-shrink:0}
+  .progress-bar{height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-top:6px}
+  .progress-fill{height:100%;border-radius:3px}
+  .skat-row{display:flex;justify-content:space-between;align-items:flex-start;padding:11px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .skat-row:last-child{border-bottom:none}
+  .skat-row.clickable{cursor:pointer}
+  .skat-row.clickable:hover{background:rgba(99,102,241,0.04)}
+  .skat-label{font-size:11px;color:#94a3b8}
+  .skat-note{font-size:10px;color:var(--muted);margin-top:2px}
+  .skat-val{font-size:12px;font-weight:700;text-align:right;flex-shrink:0;margin-left:12px}
+  .note{font-size:11px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;line-height:1.7;margin-bottom:12px}
+  .reload-btn{display:flex;align-items:center;gap:6px;background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:8px;font-family:inherit;font-size:10px;cursor:pointer}
+  .green{color:var(--green)}.red{color:var(--red)}.amber{color:var(--amber)}
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .chip{background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.25);color:#818cf8;font-size:10px;font-weight:600;padding:7px 12px;border-radius:20px;cursor:pointer;transition:all 0.15s;font-family:inherit}
+  .chip:hover{background:rgba(99,102,241,0.2)}
+  .bench-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+  .bench-row:last-child{border-bottom:none}
+  .bench-name{font-size:11px;color:#94a3b8}
+  .bench-vals{text-align:right}
+  .bench-kr{font-size:12px;font-weight:700}
+  .bench-pp{font-size:10px;margin-top:2px}
+  .section-anchor{scroll-margin-top:140px}
+  .meta-line{font-size:10px;color:var(--dim);margin-bottom:14px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="upload-screen">
+  <div class="logo-mark">D</div>
+  <div>
+    <div class="upload-title">Depotoverblik</div>
+    <div style="margin-top:8px" class="upload-sub">Træk dit investeringsdashboard ind<br>og se dit dashboard med det samme.</div>
+  </div>
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="file-input" accept=".xlsx,.xls">
+    <div class="drop-icon">📊</div>
+    <div class="drop-text">Tryk eller træk fil hertil</div>
+    <div class="drop-hint">Accepterer .xlsx dashboard fra Excel</div>
+  </div>
+  <div class="upload-note">Alle data behandles lokalt i din browser.<br>Intet sendes til nogen server.</div>
+</div>
+
+<div id="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="header-logo">
+        <div class="header-mark">D</div>
+        <div>
+          <div class="header-title">Depotoverblik</div>
+          <div class="header-date" id="hdr-date">—</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="reload-btn" onclick="resetApp()">↩ Skift fil</button>
+        <div class="header-value">
+          <div class="big" id="hdr-value">—</div>
+          <div class="small">samlet værdi</div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab(0)">Overblik</button>
+      <button class="tab-btn" onclick="showTab(1)">Top 10</button>
+      <button class="tab-btn" onclick="showTab(2)">AI-eksponering</button>
+      <button class="tab-btn" onclick="showTab(3)">Skat & afkast</button>
+      <button class="tab-btn" onclick="showTab(4)">Depoter</button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let DATA = null;
+let currentTab = 0;
+let segment = 'samlet';
+
+// ── UPLOAD ────────────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+dropZone.addEventListener('dragover', e=>{e.preventDefault();dropZone.classList.add('drag-over')});
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e=>{e.preventDefault();dropZone.classList.remove('drag-over');handleFile(e.dataTransfer.files[0])});
+fileInput.addEventListener('change', e=>handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+      DATA = parseWorkbook(wb);
+      renderApp();
+    } catch(err) {
+      alert('Kunne ikke læse filen.\n\n' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function n(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  const x = parseFloat(String(v).replace(/\s/g,'').replace(',','.'));
+  return isNaN(x) ? 0 : x;
+}
+function s(v) { return String(v === null || v === undefined ? '' : v).trim(); }
+
+function sheetRows(wb, name) {
+  const ws = wb.Sheets[name];
+  if (!ws) return [];
+  return XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+}
+function findSheet(wb, ...names) {
+  for (const nm of names) {
+    const found = wb.SheetNames.find(sn => sn.toLowerCase().replace(/\s/g,'') === nm.toLowerCase().replace(/\s/g,''));
+    if (found) return sheetRows(wb, found);
+  }
+  return [];
+}
+function findRowIdx(rows, keyword, colIdx=0, startIdx=0) {
+  for (let i = startIdx; i < rows.length; i++) {
+    if (rows[i] && s(rows[i][colIdx]).toLowerCase().includes(keyword.toLowerCase())) return i;
+  }
+  return -1;
+}
+function fmtDate(v, opts) {
+  if (v instanceof Date) return v.toLocaleDateString('da-DK', opts || {day:'2-digit',month:'2-digit',year:'numeric'});
+  return s(v);
+}
+
+// ── PARSE WORKBOOK ────────────────────────────────────────────────────────────
+function parseWorkbook(wb) {
+  const dash       = sheetRows(wb, 'Dashboard');
+  const skatRows    = findSheet(wb, 'Skat beregning');
+  const afkastRows  = findSheet(wb, 'Afkastberegning');
+  const aiRows      = findSheet(wb, 'AI eksponering');
+  const depotOvRows = findSheet(wb, 'Depotoversigt');
+  const raadataRows = findSheet(wb, 'Rådata');
+
+  if (!dash.length || !skatRows.length || !afkastRows.length || !depotOvRows.length || !raadataRows.length) {
+    throw new Error('Filen mangler en eller flere forventede faner: Dashboard, Skat beregning, Afkastberegning, Depotoversigt eller Rådata.');
+  }
+
+  const depotoversigt = parseDepotoversigt(depotOvRows);
+  const raadata = parseRaadata(raadataRows, depotoversigt);
+
+  const parsed = {
+    generatedAt: parseGeneratedAt(dash, depotOvRows, skatRows),
+    samletVaerdi: depotoversigt.reduce((acc,d)=>acc+d.vaerdi,0),
+    depotoversigt,
+    raadata,
+    afkast: parseAfkast(afkastRows),
+    etfBenchmark: parseEtfBenchmark(dash),
+    skat: parseSkat(skatRows),
+    frieMidlerPrDepot: parseFrieMidlerPrDepot(skatRows),
+    realiseredeSalg: parseRealiserede(skatRows),
+    udbytter: parseUdbytter(skatRows),
+    lagerbeskatning: parseLagerbeskatning(skatRows),
+    aiEksponering: parseAI(aiRows),
+  };
+  parsed.dataWarnings = buildDataWarnings(parsed);
+  return parsed;
+}
+
+function parseGeneratedAt(...sheets) {
+  for (const rows of sheets) {
+    for (const row of rows || []) {
+      for (const cell of row || []) {
+        const txt = s(cell);
+        if (txt.toLowerCase().includes('opdateret pr.')) return txt;
+      }
+    }
+  }
+  return '';
+}
+
+// Depotoversigt: autoritativ kilde for depot -> type (Frie midler/Pension)
+function parseDepotoversigt(rows) {
+  const headerIdx = findRowIdx(rows, 'Depot', 0);
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !s(row[0])) continue;
+    if (s(row[0]).toLowerCase() === 'i alt') break;
+    items.push({
+      navn: s(row[0]),
+      vaerdi: n(row[1]),
+      vaerdipapirer: n(row[2]),
+      likvider: n(row[3]),
+      urealiseret: n(row[4]),
+      andel: n(row[5]),
+      positioner: n(row[6]),
+      gruppe: s(row[7]), // 'Frie midler' | 'Pension'
+    });
+  }
+  return items;
+}
+
+// Rådata: per-position holdings, tagged with segment via depotoversigt lookup
+function parseRaadata(rows, depotoversigt) {
+  const depotGroup = {};
+  depotoversigt.forEach(d => depotGroup[d.navn] = d.gruppe);
+
+  const headerIdx = findRowIdx(rows, 'Kilde', 0);
+  const header = rows[headerIdx] || [];
+  const colIdx = (name) => header.findIndex(h => s(h).toLowerCase() === name.toLowerCase());
+  const cDepot = colIdx('Depot');
+  const cNavn = colIdx('Værdipapir');
+  const cKategori = colIdx('Kategori');
+  const cMarkedsvaerdi = colIdx('Markedsværdi DKK');
+  const cUrealiseret = colIdx('Urealiseret resultat DKK');
+
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !s(row[cDepot])) continue;
+    const navn = s(row[cNavn]);
+    const kategori = s(row[cKategori]);
+    if (kategori.toLowerCase().includes('likvide')) continue; // skip cash rows
+    const vaerdi = n(row[cMarkedsvaerdi]);
+    if (vaerdi <= 0) continue;
+    const depot = s(row[cDepot]);
+    items.push({
+      depot, navn, kategori,
+      vaerdi, urealiseret: n(row[cUrealiseret]),
+      segment: depotGroup[depot] === 'Pension' ? 'pension' : 'fri',
+    });
+  }
+  return items;
+}
+
+// Top 10 / Samlet pr værdipapir: built dynamically from Rådata, aggregated by navn, segment-filterable
+function aggregateBySecurity(raadata, seg) {
+  const filtered = seg === 'samlet' ? raadata : raadata.filter(r => r.segment === seg);
+  const map = {};
+  filtered.forEach(r => {
+    if (!map[r.navn]) map[r.navn] = { navn:r.navn, kategori:r.kategori, vaerdi:0, urealiseret:0, depoter:new Set() };
+    map[r.navn].vaerdi += r.vaerdi;
+    map[r.navn].urealiseret += r.urealiseret;
+    map[r.navn].depoter.add(r.depot);
+  });
+  const total = filtered.reduce((s,r)=>s+r.vaerdi, 0) || 1;
+  return Object.values(map)
+    .map(x => ({...x, depoter:x.depoter.size, andel:x.vaerdi/total}))
+    .sort((a,b)=>b.vaerdi-a.vaerdi);
+}
+
+function parseAfkast(rows) {
+  const headerIdx = findRowIdx(rows, 'Depot', 0);
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !s(row[0])) break;
+    const depot = s(row[0]);
+    const isTotal = depot.toLowerCase() === 'i alt';
+    items.push({
+      depot, isTotal,
+      segment: isTotal ? null : null, // assigned later via depotoversigt
+      vaerdi: n(row[2]), afkastKr: n(row[5]), procentgrundlag: n(row[6]), afkastPct: n(row[7]), skat: n(row[9]),
+    });
+    if (isTotal) break;
+  }
+  return items;
+}
+
+function parseEtfBenchmark(dash) {
+  // Dashboard rows: "Samlet vs ETF" / "Fisher depoter vs ETF" / "Egne aktive valg vs ETF"
+  const idx = findRowIdx(dash, 'ETF benchmark', 0);
+  const result = { label: '', rows: [] };
+  if (idx < 0) return result;
+  const labelRow = dash[findRowIdx(dash, 'Benchmark:', 0)];
+  result.label = labelRow ? s(labelRow[0]) : '';
+  for (let i = idx+1; i < dash.length; i++) {
+    const row = dash[i];
+    if (!row || !s(row[0])) break;
+    if (s(row[0]).toLowerCase().startsWith('benchmark')) break;
+    result.rows.push({ navn: s(row[0]), kr: n(row[1]), pp: n(row[2]) });
+  }
+  return result;
+}
+
+function parseSkat(rows) {
+  function findVal(keyword) {
+    const idx = findRowIdx(rows, keyword, 0);
+    return idx >= 0 ? n(rows[idx][1]) : 0;
+  }
+  return {
+    rubrik66:     findVal('Rubrik 66'),
+    rubrik345:    findVal('Rubrik 345'),
+    rubrik61:     findVal('Rubrik 61'),
+    rubrik63:     findVal('Rubrik 63'),
+    foer:         findVal('aktieindkomst før'),
+    fremfoertTab: findVal('Fremført aktietab'),
+    efter:        findVal('aktieindkomst efter fremført'),
+    restTab:      findVal('Resterende uudnyttet'),
+    metropol:     findVal('Metropol'),
+    samletAktie:  findVal('Samlet aktieindkomst'),
+    restFoer42:   findVal('Resterende plads'),
+    beloebI42:    findVal('Beløb i 42'),
+  };
+}
+
+function parseFrieMidlerPrDepot(rows) {
+  const sectionIdx = findRowIdx(rows, 'Frie midler pr. depot', 0);
+  if (sectionIdx < 0) return [];
+  let headerIdx = findRowIdx(rows, 'Depot', 0, sectionIdx);
+  if (headerIdx < 0) headerIdx = sectionIdx;
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !s(row[0])) break;
+    items.push({
+      depot: s(row[0]), rubrik66: n(row[1]), rubrik345: n(row[2]),
+      rubrik61: n(row[3]), rubrik63: n(row[4]),
+      indkomstFoerTab: n(row[5]), indeholdtSkat: n(row[6]),
+      isTotal: s(row[0]).toLowerCase() === 'i alt',
+    });
+    if (s(row[0]).toLowerCase() === 'i alt') break;
+  }
+  return items;
+}
+
+function parseRealiserede(rows) {
+  const sectionIdx = findRowIdx(rows, 'Realiserede salg', 0);
+  if (sectionIdx < 0) return [];
+  let headerIdx = findRowIdx(rows, 'Trans.række', 0, sectionIdx);
+  if (headerIdx < 0) headerIdx = sectionIdx;
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row[1]===null) continue;
+    if (s(row[0]).toLowerCase().includes('i alt')) break;
+    if (typeof row[3] !== 'string' && !row[3]) continue;
+    items.push({
+      dato: parseAnyDate(row[1]), depot: s(row[2]), navn: s(row[3]),
+      antal: n(row[5]), salgsbeloeb: n(row[6]), resultat: n(row[7]),
+      rubrik: n(row[8]), medIRubrik66: s(row[9]).toLowerCase() === 'ja',
+    });
+  }
+  return items.filter(r => r.navn);
+}
+
+function excelSerialToDate(serial) {
+  // Excel serial date (days since 1899-12-30) -> JS Date
+  const epoch = new Date(Date.UTC(1899, 11, 30));
+  return new Date(epoch.getTime() + serial * 86400000);
+}
+function parseAnyDate(v, opts) {
+  if (v instanceof Date) return v.toLocaleDateString('da-DK', opts || {day:'2-digit',month:'2-digit',year:'numeric'});
+  if (typeof v === 'number' && v > 20000 && v < 60000) {
+    return excelSerialToDate(v).toLocaleDateString('da-DK', opts || {day:'2-digit',month:'2-digit',year:'numeric'});
+  }
+  return s(v);
+}
+function parseUdbytter(rows) {
+  const sectionIdx = findRowIdx(rows, 'Rubrik 61/63', 0);
+  if (sectionIdx < 0) return [];
+  let headerIdx = findRowIdx(rows, 'Trans.række', 0, sectionIdx);
+  if (headerIdx < 0) headerIdx = sectionIdx;
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row[0]===null) continue;
+    if (s(row[0]).toLowerCase().includes('i alt')) break;
+    if (!s(row[3])) continue;
+    items.push({
+      dato: parseAnyDate(row[1], {day:'2-digit',month:'2-digit'}), depot: s(row[2]), navn: s(row[3]),
+      antal: n(row[5]), brutto: n(row[7]), skat: n(row[8]), rubrik: n(row[9]),
+    });
+  }
+  return items.filter(u => u.navn && u.brutto > 0);
+}
+
+function parseLagerbeskatning(rows) {
+  const sectionIdx = findRowIdx(rows, 'Rubrik 345: lagerbeskattede', 0);
+  if (sectionIdx < 0) return [];
+  let headerIdx = findRowIdx(rows, 'Depot', 0, sectionIdx);
+  if (headerIdx < 0) headerIdx = sectionIdx;
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !s(row[0])) continue;
+    if (s(row[0]).toLowerCase() === 'i alt') break;
+    if (s(row[0]).toLowerCase().includes('realiserede salg')) break;
+    const primo = n(row[6]), koeb = n(row[7]), salg = n(row[8]), aktuel = n(row[9]);
+    const gevinstFraArk = (row[11] !== null && row[11] !== undefined && row[11] !== '') ? n(row[11]) : null;
+    items.push({
+      depot: s(row[0]), navn: s(row[1]),
+      antal: n(row[3]), resultattype: s(row[5]),
+      primo, koeb, salg, aktuelVaerdi: aktuel,
+      rubrik: n(row[10]),
+      gevinst: gevinstFraArk !== null ? gevinstFraArk : (aktuel + salg) - (primo + koeb),
+    });
+  }
+  return items;
+}
+
+// AI eksponering: direkte (segment-filterable via Rådata match), indirekte (samlet, ikke segment-opdelt)
+function parseAI(rows) {
+  const headerIdx = findRowIdx(rows, 'Selskab', 0);
+  if (headerIdx < 0) return [];
+  const items = [];
+  for (let i = headerIdx+1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !s(row[0])) break;
+    if (s(row[0]).toLowerCase() === 'i alt') break;
+    const samlet = n(row[4]);
+    if (samlet <= 0) continue;
+    items.push({
+      navn: s(row[0]), direkteMatch: s(row[1]),
+      direkte: n(row[2]), indirekte: n(row[3]), samlet,
+      andel: n(row[5]), kildestatus: s(row[6]), note: s(row[7]),
+    });
+  }
+  return items.sort((a,b) => b.samlet - a.samlet);
+}
+
+function near(a, b, tolerance=1) { return Math.abs((a||0) - (b||0)) <= tolerance; }
+function buildDataWarnings(data) {
+  const warnings = [];
+  const skat = data.skat || {};
+  const fmpdTotal = (data.frieMidlerPrDepot || []).find(d => d.isTotal);
+  if (fmpdTotal) {
+    [
+      ['Rubrik 66', fmpdTotal.rubrik66, skat.rubrik66],
+      ['Rubrik 345', fmpdTotal.rubrik345, skat.rubrik345],
+      ['Rubrik 61', fmpdTotal.rubrik61, skat.rubrik61],
+      ['Rubrik 63', fmpdTotal.rubrik63, skat.rubrik63],
+    ].forEach(([label, split, top]) => {
+      if (!near(split, top)) warnings.push(`${label}: Depotopdeling (${fmtKr(split)}) matcher ikke nøgletal (${fmtKr(top)}).`);
+    });
+  }
+  const salg66 = (data.realiseredeSalg || []).filter(r => r.medIRubrik66).reduce((sum, r) => sum + r.resultat, 0);
+  if ((data.realiseredeSalg || []).length && !near(salg66, skat.rubrik66)) {
+    warnings.push(`Rubrik 66: Markerede realiserede salg summerer til ${fmtKr(salg66)}, mens nøgletallet er ${fmtKr(skat.rubrik66)}.`);
+  }
+  const lager345 = (data.lagerbeskatning || []).reduce((sum, r) => sum + r.gevinst, 0);
+  if ((data.lagerbeskatning || []).length && !near(lager345, skat.rubrik345)) {
+    warnings.push(`Rubrik 345: Lagerbeskatningstabellen summerer til ${fmtKr(lager345)}, mens nøgletallet er ${fmtKr(skat.rubrik345)}.`);
+  }
+  const udbytterBrutto = (data.udbytter || []).reduce((sum, u) => sum + u.brutto, 0);
+  const udbytterTop = (skat.rubrik61 || 0) + (skat.rubrik63 || 0);
+  if ((data.udbytter || []).length && !near(udbytterBrutto, udbytterTop)) {
+    warnings.push(`Rubrik 61/63: Udbetalingstabellen summerer til ${fmtKr(udbytterBrutto)}, mens nøgletallene summerer til ${fmtKr(udbytterTop)}.`);
+  }
+  return warnings;
+}
+
+// ── SEGMENT-AWARE GETTERS ─────────────────────────────────────────────────────
+function segDepoter() {
+  if (segment === 'samlet') return DATA.depotoversigt;
+  const target = segment === 'pension' ? 'Pension' : 'Frie midler';
+  return DATA.depotoversigt.filter(d => d.gruppe === target);
+}
+function segVaerdi() { return segDepoter().reduce((s,d)=>s+d.vaerdi,0); }
+
+function afkastForSegment() {
+  const groupMap = {};
+  DATA.depotoversigt.forEach(d => groupMap[d.navn] = d.gruppe);
+  const rows = DATA.afkast.filter(a => !a.isTotal);
+  const filtered = segment === 'samlet' ? rows
+    : rows.filter(a => groupMap[a.depot] === (segment==='pension'?'Pension':'Frie midler'));
+  const afkastKr = filtered.reduce((sum,a)=>sum+a.afkastKr,0);
+  const skat = filtered.reduce((sum,a)=>sum+a.skat,0);
+  const totalRow = DATA.afkast.find(a => a.isTotal);
+  const base = filtered.reduce((sum,a)=>sum+(a.procentgrundlag||0),0);
+  const afkastPct = segment === 'samlet' && totalRow ? totalRow.afkastPct : (base ? afkastKr/base : 0);
+  return { rows: filtered, afkastKr, skat, afkastPct };
+}
+
+// AI direkte: matched against Rådata for segment-filtering
+function aiDirekteForSegment() {
+  const raadata = DATA.raadata;
+  return DATA.aiEksponering.map(a => {
+    if (!a.direkteMatch) return { ...a, direkteSeg: 0 };
+    const matches = raadata.filter(r => r.navn === a.direkteMatch &&
+      (segment === 'samlet' || r.segment === segment));
+    const direkteSeg = matches.reduce((s,r)=>s+r.vaerdi, 0);
+    return { ...a, direkteSeg };
+  }).sort((a,b)=> (b.direkteSeg + b.indirekte) - (a.direkteSeg + a.indirekte));
+}
+
+// ── FORMAT ────────────────────────────────────────────────────────────────────
+function fmt(v, dec=0) { return new Intl.NumberFormat('da-DK',{minimumFractionDigits:dec,maximumFractionDigits:dec}).format(v); }
+function fmtKr(v) { return fmt(v)+' kr.'; }
+function fmtPct(v, dec=1) { return (v*100).toFixed(dec)+' %'; }
+function fmtPP(v, dec=2) { return (v>=0?'+':'')+(v*100).toFixed(dec)+' pp'; }
+function pos(v) { return v >= 0; }
+function depotColor(gruppe) { return gruppe === 'Pension' ? '#a78bfa' : '#3b82f6'; }
+function segLabel() { return segment === 'pension' ? 'Pension' : segment === 'fri' ? 'Frie midler' : 'Samlet'; }
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderApp() {
+  document.getElementById('hdr-value').textContent = fmt(DATA.samletVaerdi)+' kr.';
+  document.getElementById('hdr-date').textContent = DATA.generatedAt || new Date().toLocaleDateString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric'});
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  showTab(0);
+}
+
+function showTab(i) {
+  currentTab = i;
+  document.querySelectorAll('.tab-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+  const el = document.getElementById('content');
+  el.innerHTML = '';
+  [renderOverblik, renderTop10, renderAI, renderSkatAfkast, renderDepoter][i](el);
+  el.scrollTop = 0;
+}
+
+function setSegment(seg) { segment = seg; showTab(currentTab); }
+
+function segFilterHTML() {
+  return `<div class="seg-filter">
+    <button class="seg-btn ${segment==='samlet'?'active':''}" onclick="setSegment('samlet')">Samlet</button>
+    <button class="seg-btn ${segment==='pension'?'active pension':''}" onclick="setSegment('pension')">Pension</button>
+    <button class="seg-btn ${segment==='fri'?'active fri':''}" onclick="setSegment('fri')">Frie midler</button>
+  </div>`;
+}
+function segBadge() {
+  if (segment==='samlet') return '';
+  const cls = segment==='pension'?'pension':'fri';
+  return `<div class="seg-badge ${cls}">⬡ Filtreret: ${segLabel()}</div>`;
+}
+function kpi(label, value, sub, accent) {
+  return `<div class="kpi" style="--accent:${accent||'#6366f1'}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    ${sub?`<div class="kpi-sub">${sub}</div>`:''}
+  </div>`;
+}
+
+// ── TAB 0: OVERBLIK ───────────────────────────────────────────────────────────
+function renderOverblik(el) {
+  const segV = segVaerdi();
+  const af = afkastForSegment();
+  const samlet = DATA.samletVaerdi || 1;
+  const aiSeg = aiDirekteForSegment();
+  const totalAIDirekte = aiSeg.reduce((s,a)=>s+a.direkteSeg,0);
+
+  el.innerHTML += segFilterHTML();
+
+  el.innerHTML += `<div class="kpi-grid">
+    ${kpi('Porteføljeværdi', fmt(segV)+' kr.', segment!=='samlet'?segLabel():'inkl. likvider','#6366f1')}
+    ${kpi('Afkast i år', fmtKr(af.afkastKr), (af.afkastKr>=0?'+':'')+fmtPct(af.afkastPct),'#10b981')}
+    ${kpi('Estimeret skat/afgift', fmtKr(af.skat), 'foreløbig','#ef4444')}
+    ${kpi('AI-eksponering (direkte)', fmtKr(totalAIDirekte), fmtPct(totalAIDirekte/samlet)+' af samlet','#f59e0b')}
+  </div>`;
+
+  // Afkast pr. depot table
+  el.innerHTML += `<div class="card">
+    <div class="card-title">Afkast pr. depot <span class="badge">${segLabel()}</span></div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Depot</th><th class="r">Afkast kr.</th><th class="r">Afkast %</th><th class="r">Skat/afgift</th></tr></thead>
+      <tbody>
+        ${af.rows.map(a=>`<tr>
+          <td style="color:#94a3b8;font-size:10px">${a.depot}</td>
+          <td class="r ${pos(a.afkastKr)?'green':'red'}">${fmtKr(a.afkastKr)}</td>
+          <td class="r ${pos(a.afkastPct)?'green':'red'}">${fmtPct(a.afkastPct)}</td>
+          <td class="r ${a.skat>0?'red':''}">${a.skat>0?fmtKr(a.skat):'—'}</td>
+        </tr>`).join('')}
+        <tr class="total">
+          <td>I alt</td><td class="r">${fmtKr(af.afkastKr)}</td>
+          <td class="r">${fmtPct(af.afkastPct)}</td><td class="r">${fmtKr(af.skat)}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>`;
+
+  // ETF benchmark
+  const bench = DATA.etfBenchmark;
+  if (bench.rows.length > 0) {
+    el.innerHTML += `<div class="card">
+      <div class="card-title">ETF-benchmark</div>
+      <div class="card-sub">${bench.label}</div>
+      ${bench.rows.map(r=>`<div class="bench-row">
+        <div class="bench-name">${r.navn}</div>
+        <div class="bench-vals">
+          <div class="bench-kr ${pos(r.kr)?'green':'red'}">${r.kr>=0?'+':''}${fmt(Math.round(r.kr))} kr.</div>
+          <div class="bench-pp ${pos(r.pp)?'green':'red'}">${fmtPP(r.pp)}</div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }
+}
+
+// ── TAB 1: TOP 10 ─────────────────────────────────────────────────────────────
+function renderTop10(el) {
+  el.innerHTML += segFilterHTML();
+  el.innerHTML += segBadge();
+
+  const items = aggregateBySecurity(DATA.raadata, segment);
+  const top = items.slice(0,10);
+  const maxV = top.length>0 ? top[0].vaerdi : 1;
+
+  el.innerHTML += `<div class="card">
+    <div class="card-title">Top ${top.length} positioner <span class="badge">${segLabel()}</span></div>
+    ${top.map((p,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+        <div class="rank">${String(i+1).padStart(2,'0')}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:${i<3?600:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.navn}</div>
+          <div class="progress-bar" style="margin-top:5px"><div class="progress-fill" style="width:${(p.vaerdi/maxV*100).toFixed(1)}%;background:rgba(99,102,241,${0.9-i*0.06})"></div></div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:12px;font-weight:600">${fmt(Math.round(p.vaerdi/1000))} t.</div>
+          <div style="font-size:10px;color:var(--muted)">${fmtPct(p.andel)}</div>
+        </div>
+      </div>`).join('')}
+  </div>`;
+
+  if (items.length > 10) {
+    el.innerHTML += `<div class="card">
+      <div class="card-title">Alle positioner <span class="badge">${items.length} papirer</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>#</th><th>Værdipapir</th><th class="r">Værdi</th><th class="r">Urealis.</th></tr></thead>
+        <tbody>
+          ${items.slice(10).map((p,i)=>`<tr>
+            <td style="color:var(--muted)">${i+11}</td>
+            <td style="color:#94a3b8;font-size:10px">${p.navn}</td>
+            <td class="r">${fmt(Math.round(p.vaerdi/1000))} t.</td>
+            <td class="r ${pos(p.urealiseret)?'green':'red'}">${p.urealiseret>=0?'+':''}${fmt(Math.round(p.urealiseret/1000))} t.</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+}
+
+// ── TAB 2: AI ─────────────────────────────────────────────────────────────────
+function renderAI(el) {
+  el.innerHTML += segFilterHTML();
+  el.innerHTML += segBadge();
+
+  const samlet = DATA.samletVaerdi || 1;
+  const items = aiDirekteForSegment();
+  const totalDir = items.reduce((s,a)=>s+a.direkteSeg,0);
+  const totalIndir = items.reduce((s,a)=>s+a.indirekte,0);
+  const totalSam = totalDir + totalIndir;
+
+  el.innerHTML += `<div class="kpi-grid three">
+    ${kpi('Direkte', fmtKr(totalDir), fmtPct(totalDir/samlet),'#f59e0b')}
+    ${kpi('Indirekte', fmtKr(totalIndir), 'ikke opdelt på udsnit','#f97316')}
+    ${kpi('Samlet', fmtKr(totalSam), fmtPct(totalSam/samlet),'#ef4444')}
+  </div>`;
+
+  if (segment !== 'samlet') {
+    el.innerHTML += `<div class="note">ℹ️ Indirekte eksponering (look-through fra ETF'er) kan ikke entydigt henføres til Pension eller Frie midler, da samme ETF kan ligge i flere depottyper. Indirekte vises derfor uforkortet uanset valgt udsnit. Direkte eksponering er korrekt filtreret.</div>`;
+  }
+
+  const sorted = items.filter(a=>a.direkteSeg>0||a.indirekte>0).sort((a,b)=>(b.direkteSeg+b.indirekte)-(a.direkteSeg+a.indirekte));
+  if (sorted.length > 0) {
+    const maxSam = Math.max(...sorted.map(a=>a.direkteSeg+a.indirekte));
+    el.innerHTML += `<div class="card">
+      <div class="card-title">Eksponering pr. selskab <span class="badge">${segLabel()}</span></div>
+      <div style="display:flex;gap:16px;margin-bottom:14px;font-size:10px;color:var(--muted)">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:var(--amber);border-radius:2px;display:inline-block"></span>Direkte</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:rgba(245,158,11,0.35);border-radius:2px;display:inline-block"></span>Indirekte</span>
+      </div>
+      ${sorted.map(a=>{
+        const tot = a.direkteSeg + a.indirekte;
+        const dPct = (a.direkteSeg/maxSam*100).toFixed(1);
+        const iPct = (a.indirekte/maxSam*100).toFixed(1);
+        return `<div class="ai-bar-row">
+          <div class="ai-bar-name">${a.navn}</div>
+          <div class="ai-bar-wrap">
+            <div class="ai-bar-track">
+              <div class="ai-bar-direct" style="width:${dPct}%"></div>
+              <div class="ai-bar-indirect" style="width:${iPct}%"></div>
+            </div>
+            <div class="ai-bar-labels">
+              ${a.direkteSeg>0?`<span style="color:var(--amber)">${fmt(Math.round(a.direkteSeg/1000))} t.</span>`:''}
+              ${a.indirekte>0?`<span style="color:rgba(245,158,11,0.6)">${fmt(Math.round(a.indirekte/1000))} t.</span>`:''}
+            </div>
+          </div>
+          <div class="ai-bar-total">${fmt(Math.round(tot/1000))} t.</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+    el.innerHTML += `<div class="card">
+      <div class="card-title">Totaler</div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Selskab</th><th class="r">Direkte</th><th class="r">Indirekte</th><th class="r">Samlet</th></tr></thead>
+        <tbody>
+          ${sorted.map(a=>`<tr>
+            <td style="font-size:11px">${a.navn}</td>
+            <td class="r" style="color:var(--amber)">${a.direkteSeg>0?fmt(Math.round(a.direkteSeg/1000))+' t.':'—'}</td>
+            <td class="r" style="color:rgba(245,158,11,0.6)">${a.indirekte>0?fmt(Math.round(a.indirekte/1000))+' t.':'—'}</td>
+            <td class="r" style="font-weight:600">${fmt(Math.round((a.direkteSeg+a.indirekte)/1000))} t.</td>
+          </tr>`).join('')}
+          <tr class="total">
+            <td>I alt</td>
+            <td class="r">${fmt(Math.round(totalDir/1000))} t.</td>
+            <td class="r">${fmt(Math.round(totalIndir/1000))} t.</td>
+            <td class="r">${fmt(Math.round(totalSam/1000))} t.</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+}
+
+// ── TAB 3: SKAT & AFKAST ──────────────────────────────────────────────────────
+function renderSkatAfkast(el) {
+  const skat = DATA.skat;
+  const ialtr = DATA.afkast.find(a=>a.isTotal) || {};
+  const totalKr = ialtr.afkastKr || 0;
+  const totalSkat = ialtr.skat || 0;
+  const samlet = DATA.samletVaerdi || 1;
+
+  // KPI
+  el.innerHTML += `<div class="kpi-grid">
+    ${kpi('Samlet afkast i år', fmtKr(totalKr), fmtPct(ialtr.afkastPct||0),'#10b981')}
+    ${kpi('Resterende uudnyttet aktietab', fmtKr(skat.restTab), 'fremføres til senere år','#f59e0b')}
+    ${kpi('Realiseret gevinst/tab', fmtKr(skat.rubrik66), 'Rubrik 66',skat.rubrik66>=0?'#10b981':'#ef4444')}
+    ${kpi('Estimeret skat/afgift', fmtKr(totalSkat), 'på tværs af depottyper','#ef4444')}
+  </div>`;
+
+  if (DATA.dataWarnings && DATA.dataWarnings.length) {
+    el.innerHTML += `<div class="note" style="border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.06)">⚠️ <strong>Datakontrol:</strong><br>${DATA.dataWarnings.map(w=>`• ${w}`).join('<br>')}</div>`;
+  }
+
+  // Afkast pr depot
+  el.innerHTML += `<div class="card">
+    <div class="card-title">Afkast i år og foreløbig skat/afgift</div>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>Depot</th><th class="r">Afkast kr.</th><th class="r">Afkast %</th><th class="r">Skat/afgift</th></tr></thead>
+      <tbody>
+        ${DATA.afkast.filter(a=>!a.isTotal).map(a=>`<tr>
+          <td style="color:#94a3b8;font-size:10px">${a.depot}</td>
+          <td class="r ${pos(a.afkastKr)?'green':'red'}">${fmtKr(a.afkastKr)}</td>
+          <td class="r ${pos(a.afkastPct)?'green':'red'}">${fmtPct(a.afkastPct)}</td>
+          <td class="r ${a.skat>0?'red':''}">${a.skat>0?fmtKr(a.skat):'—'}</td>
+        </tr>`).join('')}
+        <tr class="total">
+          <td>I alt</td><td class="r">${fmtKr(totalKr)}</td>
+          <td class="r">${fmtPct(ialtr.afkastPct||0)}</td><td class="r">${fmtKr(totalSkat)}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>`;
+
+  // Skat overblik med genvejschips
+  el.innerHTML += `<div class="card section-anchor" id="skat-overblik">
+    <div class="card-title">Skat – nøgletalsoversigt</div>
+    <div class="chip-row">
+      <button class="chip" onclick="document.getElementById('rubrik-66').scrollIntoView({behavior:'smooth'})">Rubrik 66 →</button>
+      <button class="chip" onclick="document.getElementById('rubrik-345').scrollIntoView({behavior:'smooth'})">Rubrik 345 →</button>
+      <button class="chip" onclick="document.getElementById('rubrik-6163').scrollIntoView({behavior:'smooth'})">Rubrik 61/63 →</button>
+    </div>
+    ${[
+      ['Rubrik 66 – realisationsbeskattede aktier', skat.rubrik66, 'Almindelige aktier, realiseret gevinst/tab'],
+      ['Rubrik 345 – lagerbeskattede papirer', skat.rubrik345, 'ETF/fond, realiseret + urealiseret lagerresultat'],
+      ['Rubrik 61 – danske udbytter', skat.rubrik61, 'Brutto danske aktieudbytter'],
+      ['Rubrik 63 – udenlandske udbytter', skat.rubrik63, 'Brutto udenlandske aktieudbytter'],
+      ['Nordnet aktieindkomst før tab', skat.foer, 'Rubrik 66 + 345 + 61 + 63'],
+      ['Fremført aktietab til modregning', -skat.fremfoertTab, 'Fra årsopgørelse/TastSelv'],
+      ['Nordnet aktieindkomst efter tab', skat.efter, 'Skattepligtig rest efter fremført tab'],
+      ['Resterende uudnyttet aktietab', -skat.restTab, 'Fremføres til senere år'],
+      ['Metropol III brutto udbytte', skat.metropol, 'Holdes særskilt fra Nordnet'],
+      ['Samlet aktieindkomst', skat.samletAktie, 'Nordnet efter tab + Metropol III'],
+      ['Resterende plads før 42 %', skat.restFoer42, 'Ægtefællers progressionsgrænse'],
+    ].map(([l,v,note])=>`<div class="skat-row">
+      <div><div class="skat-label">${l}</div><div class="skat-note">${note}</div></div>
+      <div class="skat-val ${v<0?'red':''}">${fmtKr(v)}</div>
+    </div>`).join('')}
+  </div>`;
+
+  // Frie midler pr. depot - rubrik split per depot
+  const fmpd = DATA.frieMidlerPrDepot || [];
+  if (fmpd.length > 0) {
+    el.innerHTML += `<div class="card">
+      <div class="card-title">Frie midler pr. depot</div>
+      <div class="card-sub">Rubrik 66/345/61/63 opdelt på depot. Kontrolsum mod nøgletalsoversigten ovenfor.</div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Depot</th><th class="r">Rubrik 66</th><th class="r">Rubrik 345</th><th class="r">Rubrik 61</th><th class="r">Rubrik 63</th><th class="r">Indkomst før tab</th></tr></thead>
+        <tbody>
+          ${fmpd.filter(d=>!d.isTotal).map(d=>`<tr>
+            <td style="font-size:10px">${d.depot}</td>
+            <td class="r ${pos(d.rubrik66)?'':'red'}">${fmt(Math.round(d.rubrik66))}</td>
+            <td class="r">${fmt(Math.round(d.rubrik345))}</td>
+            <td class="r">${fmt(Math.round(d.rubrik61))}</td>
+            <td class="r">${fmt(Math.round(d.rubrik63))}</td>
+            <td class="r" style="font-weight:600">${fmt(Math.round(d.indkomstFoerTab))}</td>
+          </tr>`).join('')}
+          ${fmpd.filter(d=>d.isTotal).map(d=>`<tr class="total">
+            <td>I alt</td>
+            <td class="r">${fmt(Math.round(d.rubrik66))}</td>
+            <td class="r">${fmt(Math.round(d.rubrik345))}</td>
+            <td class="r">${fmt(Math.round(d.rubrik61))}</td>
+            <td class="r">${fmt(Math.round(d.rubrik63))}</td>
+            <td class="r">${fmt(Math.round(d.indkomstFoerTab))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // Rubrik 66 detail: ALL realiserede salg, with rubrik 66 highlighted
+  const salg = DATA.realiseredeSalg || [];
+  if (salg.length > 0) {
+    const tot66 = salg.filter(r=>r.medIRubrik66).reduce((s,r)=>s+r.resultat,0);
+    el.innerHTML += `<div class="card section-anchor" id="rubrik-66">
+      <div class="card-title">Rubrik 66 – realiserede salg <span class="badge">${salg.length} salg, heraf ${salg.filter(r=>r.medIRubrik66).length} i rubrik 66</span></div>
+      <div class="card-sub">Alle realiserede salg vises. Rækker markeret med ⬤ tæller med i Rubrik 66 (almindelige realisationsbeskattede aktier). Øvrige salg hører under Rubrik 345 (lagerbeskattet) og indgår ikke i totalen herunder.</div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th></th><th>Dato</th><th>Værdipapir</th><th>Depot</th><th class="r">Rubrik</th><th class="r">Salgsbeløb</th><th class="r">Resultat</th></tr></thead>
+        <tbody>
+          ${salg.map(r=>`<tr style="${r.medIRubrik66?'background:rgba(245,158,11,0.06)':''}">
+            <td style="text-align:center">${r.medIRubrik66?'<span style="color:var(--amber)">⬤</span>':''}</td>
+            <td style="color:var(--muted);white-space:nowrap">${r.dato}</td>
+            <td style="font-size:10px;${r.medIRubrik66?'font-weight:600':''}">${r.navn}</td>
+            <td style="font-size:10px;color:var(--muted)">${r.depot}</td>
+            <td class="r" style="color:${r.medIRubrik66?'var(--amber)':'var(--muted)'}">${r.rubrik || '—'}</td>
+            <td class="r">${fmt(Math.round(r.salgsbeloeb))}</td>
+            <td class="r ${pos(r.resultat)?'green':'red'}">${r.resultat>=0?'+':''}${fmt(Math.round(r.resultat))}</td>
+          </tr>`).join('')}
+          <tr class="total">
+            <td colspan="6">I alt rubrik 66 (⬤ markerede)</td>
+            <td class="r ${pos(tot66)?'green':'red'}">${tot66>=0?'+':''}${fmt(Math.round(tot66))}</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // Rubrik 345 detail: lagerbeskatning, viser gevinst/tab
+  const lager = DATA.lagerbeskatning || [];
+  if (lager.length > 0) {
+    const totGevinst = lager.reduce((s,r)=>s+r.gevinst,0);
+    el.innerHTML += `<div class="card section-anchor" id="rubrik-345">
+      <div class="card-title">Rubrik 345 – lagerbeskattede papirer <span class="badge">${lager.length} positioner</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Værdipapir</th><th>Depot</th><th>Type</th><th class="r">Rubrik</th><th class="r">Gevinst/tab</th></tr></thead>
+        <tbody>
+          ${lager.map(r=>`<tr>
+            <td style="font-size:10px">${r.navn}</td>
+            <td style="font-size:10px;color:var(--muted)">${r.depot}</td>
+            <td style="font-size:9px;color:var(--muted)">${r.resultattype}</td>
+            <td class="r" style="color:var(--muted)">${r.rubrik || '—'}</td>
+            <td class="r ${pos(r.gevinst)?'green':'red'}" style="font-weight:600">${r.gevinst>=0?'+':''}${fmt(Math.round(r.gevinst))}</td>
+          </tr>`).join('')}
+          <tr class="total">
+            <td colspan="4">I alt rubrik 345</td>
+            <td class="r ${pos(totGevinst)?'green':'red'}">${totGevinst>=0?'+':''}${fmt(Math.round(totGevinst))}</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  // Rubrik 61/63 detail: udbytter
+  const udb = DATA.udbytter || [];
+  if (udb.length > 0) {
+    const totBrutto = udb.reduce((s,u)=>s+u.brutto,0);
+    const totSkat = udb.reduce((s,u)=>s+u.skat,0);
+    el.innerHTML += `<div class="card section-anchor" id="rubrik-6163">
+      <div class="card-title">Rubrik 61/63 – udbetalte udbytter <span class="badge">${udb.length} udbetalinger</span></div>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Dato</th><th>Selskab</th><th>Depot</th><th class="r">Rubrik</th><th class="r">Brutto</th><th class="r">Skat</th></tr></thead>
+        <tbody>
+          ${udb.map(u=>`<tr>
+            <td style="color:var(--muted);white-space:nowrap">${u.dato}</td>
+            <td style="font-size:10px">${u.navn}</td>
+            <td style="font-size:10px;color:var(--muted)">${u.depot}</td>
+            <td class="r" style="color:var(--muted)">${u.rubrik || '—'}</td>
+            <td class="r">${fmt(Math.round(u.brutto))}</td>
+            <td class="r" style="color:var(--muted)">${fmt(Math.round(u.skat))}</td>
+          </tr>`).join('')}
+          <tr class="total">
+            <td colspan="4">I alt</td>
+            <td class="r">${fmt(Math.round(totBrutto))}</td>
+            <td class="r">${fmt(Math.round(totSkat))}</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>`;
+  }
+
+  el.innerHTML += `<div class="note">ℹ️ Fremført aktietab modregnes kun i Nordnet-aktieindkomst. Metropol III holdes særskilt. Pensionsdepoter beskattes med PAL-sats (15,3 %). Estimeret skat er vejledende.</div>`;
+}
+
+// ── TAB 4: DEPOTER ────────────────────────────────────────────────────────────
+function renderDepoter(el) {
+  el.innerHTML += `<div class="depot-list">
+    ${DATA.depotoversigt.map(d=>{
+      const c = depotColor(d.gruppe);
+      const urPct = d.vaerdi>0 ? d.urealiseret/d.vaerdi : 0;
+      return `<div class="card" style="border-left:3px solid ${c}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:600">${d.navn}</div>
+          <div style="font-size:10px;color:${c};background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:20px">${d.gruppe}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">Markedsværdi</div><div style="font-size:13px;font-weight:600">${fmt(Math.round(d.vaerdi/1000))} t.kr.</div></div>
+          <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">Urealiseret</div><div style="font-size:13px;font-weight:600" class="${pos(d.urealiseret)?'green':'red'}">${d.urealiseret>=0?'+':''}${fmt(Math.round(d.urealiseret/1000))} t.</div></div>
+          <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">Andel</div><div style="font-size:12px;font-weight:600">${fmtPct(d.andel)}</div></div>
+          <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">Positioner</div><div style="font-size:12px;font-weight:600">${d.positioner}</div></div>
+        </div>
+        <div class="progress-bar" style="margin-top:10px"><div class="progress-fill" style="width:${Math.min(d.andel*100,100).toFixed(1)}%;background:${c}"></div></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function resetApp() {
+  DATA = null; segment = 'samlet';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('upload-screen').style.display = 'flex';
+  document.getElementById('file-input').value = '';
+}
+</script>
+</body>
+</html>
