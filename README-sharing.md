@@ -1,6 +1,6 @@
 # Delt uge i madplansappen
 
-Denne implementering giver korte links uden TinyURL og gør det muligt, at to personer kan åbne og redigere samme uge.
+Denne opsætning giver korte links uden TinyURL og gør det muligt, at to personer kan åbne og redigere samme uge.
 
 ## Hvad der er sat op
 
@@ -22,13 +22,17 @@ Kolonner:
 
 ## Filer i repoet
 
+`madplan/index.html`
+
+Selve appen. Den er nu ændret, så `Del uge` ikke bruger TinyURL eller is.gd. Hvis Google Apps Script URL er sat op, bruger appen i stedet korte links i formatet `?uge=kortId`.
+
 `apps-script/Code.gs`
 
 Backend til Google Apps Script. Den gemmer ugens data i Google Sheet og henter seneste version ud fra id.
 
 `shared-week-client.js`
 
-Frontend hjælper til GitHub Pages appen. Den kan gemme, hente, dele og autosave en delt uge.
+Ekstern hjælperfil. Den ligger klar, men appen har også fået den nødvendige delingslogik direkte i `madplan/index.html`.
 
 ## Deploy af backend
 
@@ -39,76 +43,21 @@ Frontend hjælper til GitHub Pages appen. Den kan gemme, hente, dele og autosave
 5. Vælg `Execute as: Me`.
 6. Vælg `Who has access: Anyone with the link`.
 7. Kopiér Web app URL.
-8. Indsæt den i `shared-week-client.js` her:
+8. Send URL’en til ChatGPT, så den kan indsættes direkte i `madplan/index.html`.
 
-```js
-window.MADPLAN_SHARE_CONFIG = window.MADPLAN_SHARE_CONFIG || {
-  apiUrl: 'PASTE_DEPLOYED_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE',
-  urlParam: 'uge',
-  autosaveDelayMs: 900
-};
-```
+## Midlertidig fallback
 
-## Kobling i appen
+Indtil Web App URL’en er sat ind, deler appen stadig direkte uden TinyURL. Linket er længere, men der er ingen mellemside og ingen ekstern linkforkorter.
 
-Appen skal have scriptet indlæst:
+## Endelig linkform
 
-```html
-<script src="shared-week-client.js"></script>
-```
-
-Knappen `Del uge` skal kalde:
-
-```js
-MadplanShare.shareCurrentWeek({
-  getState: collectMadplanState,
-  editor: 'Michael'
-});
-```
-
-Ved opstart skal appen hente delt uge, hvis URL indeholder `?uge=...`:
-
-```js
-MadplanShare.loadFromUrl({
-  applyState: applyMadplanState
-});
-```
-
-Efter ændringer i valg skal autosave trigges:
-
-```js
-const autosave = MadplanShare.startAutoSave({
-  getState: collectMadplanState,
-  editor: 'Michael'
-});
-
-// Kald denne når retter eller valg ændres
-autosave.schedule();
-```
-
-## De to app-specifikke funktioner
-
-Der mangler kun, at den konkrete madplansapp definerer disse to funktioner, fordi de afhænger af appens nuværende datastruktur:
-
-```js
-function collectMadplanState() {
-  return {
-    // returnér de valgte retter, justeringer, ekstra varer osv.
-  };
-}
-
-function applyMadplanState(state) {
-  // skriv state tilbage i appens UI og genberegn madplan, pdf og indkøbsliste
-}
-```
-
-Når de to funktioner er koblet til appens eksisterende state, bliver linket kort:
+Når Apps Script URL’en er sat ind, bliver linket kort og direkte:
 
 ```text
-https://mgforever26.github.io/investeringsdashboard/?uge=Ab7kP2xQ
+https://mgforever26.github.io/investeringsdashboard/madplan/?uge=Ab7kP2xQ
 ```
 
-Ingen TinyURL. Ingen mellemstation. Direkte ind i appen.
+Begge kan åbne samme link og redigere samme uge.
 
 ## Redigering fra to personer
 
