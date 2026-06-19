@@ -1,0 +1,44 @@
+name: Patch madplan layout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/patch-madplan-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch top layout
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('madplan/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace(
+            '.brand{display:flex;gap:10px;align-items:center;margin-bottom:11px}.mark{width:36px;height:36px;border-radius:14px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800}.brand b{display:block;font-size:15px}.brand small{display:block;color:var(--muted);font-size:11px;margin-top:1px}',
+            '.brand{display:flex;gap:12px;align-items:center;margin-bottom:13px}.mark{width:44px;height:44px;border-radius:16px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:900;font-size:18px}.brand b{display:block;font-size:22px;letter-spacing:-.04em;line-height:1}.brand small{display:block;color:var(--muted);font-size:12px;margin-top:3px}'
+          )
+          s = s.replace(
+            'h1,h2,h3{margin:0}h2{font-size:18px;letter-spacing:-.03em}.sub',
+            'h1,h2,h3{margin:0}h2{font-size:18px;letter-spacing:-.03em}.hero-title{font-size:34px;letter-spacing:-.07em;line-height:1;color:var(--accent);margin:0 0 4px}.hero-kicker{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.10em;color:var(--muted);margin-bottom:4px}.sub'
+          )
+          s = s.replace(
+            '<div class="card"><h2>Ugens madplan</h2><p class="sub">Vælg antal dage, kød-dage og retter. Ingredienserne føres automatisk over i indkøbslisten.</p>',
+            '<div class="card"><div class="hero-kicker">Ugens overblik</div><h1 class="hero-title">Madplan</h1><p class="sub">Vælg antal dage, kød-dage og retter. Ingredienserne føres automatisk over i indkøbslisten.</p>'
+          )
+          Path('.github/workflows/patch-madplan-layout.yml').unlink()
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add madplan/index.html .github/workflows/patch-madplan-layout.yml
+          git commit -m "Juster top layout i madplan"
+          git push
