@@ -1,0 +1,34 @@
+name: Patch madplan PDF spacing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/patch-madplan-spacing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch spacing
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('madplan/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<h1 style="margin-top:20px">Indkøbslisten</h1>', '<h1 style="margin-top:34px">Indkøbslisten</h1>')
+          s = s.replace('plan.forEach((rid,i)=>addFull(`Dag ${i+1}: ${cap(byId(rid).name)}`,17,false,1));y-=10;addFull(\'Indkøbslisten\',27,true,8);', 'plan.forEach((rid,i)=>addFull(`Dag ${i+1}: ${cap(byId(rid).name)}`,17,false,1));y-=24;addFull(\'Indkøbslisten\',27,true,8);')
+          Path('.github/workflows/patch-madplan-spacing.yml').unlink()
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add madplan/index.html .github/workflows/patch-madplan-spacing.yml
+          git commit -m "Tilføj luft i PDF-visning"
+          git push
