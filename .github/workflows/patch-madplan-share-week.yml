@@ -1,0 +1,42 @@
+name: Patch madplan share week
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/patch-madplan-share-week.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch share week
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('madplan/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('let recipes=[],plan=[],shopping=[],days=4,meatDays=1,excluded={};', 'let recipes=[],plan=[],shopping=[],days=4,meatDays=1,excluded={},sharedShopping=null;')
+          old_store = "const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};"
+          share_code = r'''const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};
+function encState(obj){return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function decState(str){str=str.replace(/-/g,'+').replace(/_/g,'/');while(str.length%4)str+='=';return JSON.parse(decodeURIComponent(escape(atob(str))))}
+function loadSharedWeek(){let m=location.hash.match(/uge=([^&]+)/);if(!m)return false;try{let d=decState(m[1]);if(Array.isArray(d.recipes))d.recipes.forEach(r=>{let nr=normalizeRecipe(r);if(nr.name&&!recipes.some(x=>x.id===nr.id))recipes.push(nr)});days=Number(d.days)||4;meatDays=Number(d.meatDays??1);excluded=d.excluded||{};plan=(d.plan||[]).filter(x=>recipes.some(r=>r.id===x));if(!plan.length&&Array.isArray(d.recipes))plan=d.recipes.map(r=>normalizeRecipe(r).id).filter(x=>recipes.some(r=>r.id===x)).slice(0,days);sharedShopping=Array.isArray(d.shopping)?d.shopping.map(i=>({id:id(),name:String(i.name||'').trim(),category:String(i.category||'andet'),qty:Number(i.qty)||1,on:i.on!==false,source:i.source||'delt'})).filter(i=>i.name):null;saveSession();history.replaceState(null,'',location.pathname+location.search);return true}catch(e){console.warn('Kunne ikke indlæse delt uge',e);return false}}
+async function shareWeek(){let chosen=plan.map(byId).filter(Boolean).map(r=>({id:r.id,name:r.name,type:r.type,ingredients:r.ingredients}));let cleanShopping=shopping.map(i=>({name:i.name,category:i.category,qty:i.qty,on:i.on,source:i.source}));let payload={v:1,days,meatDays,plan,excluded,recipes:chosen,shopping:cleanShopping};let link=location.origin+location.pathname+'#uge='+encState(payload);try{await navigator.clipboard.writeText(link);alert('Del uge-link er kopieret. Send det til hende.')}catch(e){prompt('Kopiér del uge-linket:',link)}};'''
+          s = s.replace(old_store, share_code)
+          s = s.replace('if(!plan.length)generatePlan();buildShopping();renderAll()}', 'loadSharedWeek();if(!plan.length)generatePlan();buildShopping();if(sharedShopping){shopping=sharedShopping;sharedShopping=null}renderAll()}')
+          s = s.replace('<button class="btn secondary" onclick="openPdf()">Åbn PDF</button><button class="btn ghost" onclick="downloadTxt()">Download tekst</button>', '<button class="btn secondary" onclick="openPdf()">Åbn PDF</button><button class="btn secondary" onclick="shareWeek()">Del uge</button><button class="btn ghost" onclick="downloadTxt()">Download tekst</button>')
+          Path('.github/workflows/patch-madplan-share-week.yml').unlink()
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add madplan/index.html .github/workflows/patch-madplan-share-week.yml
+          git commit -m "Tilføj Del uge link"
+          git push
