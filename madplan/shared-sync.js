@@ -1,6 +1,7 @@
 (function(){
   const API='https://script.google.com/macros/s/AKfycbzJyz-EbpidFmHsylCUqJ16uuDPHWUDfQde2bcOwYs6egreJwKqeKsYUshl8ov7RnA/exec';
   const CURRENT_ID='madplan-faelles-aktiv';
+  const LOCAL_STATE_KEY='madplan_state_local_v1';
   if(!API) return;
   let syncing=false,timer=null;
 
@@ -13,8 +14,31 @@
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
   }
 
+  function writeLocalState(){
+    try{if(typeof stateObj==='function') localStorage.setItem(LOCAL_STATE_KEY,JSON.stringify(stateObj()));}catch(e){}
+  }
+
+  function restoreLocalState(){
+    try{
+      let raw=localStorage.getItem(LOCAL_STATE_KEY);
+      if(!raw) return false;
+      let data=JSON.parse(raw);
+      if(!data) return false;
+      shopping=[]; pendingShopping=null;
+      applyState(data);
+      if(pendingShopping){
+        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:i.category,qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
+        pendingShopping=null;
+        buildShopping();
+      }else buildShopping();
+      renderAll();
+      return true;
+    }catch(e){return false;}
+  }
+
   function saveRemoteNow(){
     try{
+      writeLocalState();
       if(!activeWeek || !activeWeek.id || typeof stateObj!=='function') return;
       const body=new URLSearchParams({
         action:'save',
@@ -24,14 +48,15 @@
         lastEditor:'app',
         note:activeWeek.label||''
       });
-      fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
+      fetch(API,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
     }catch(e){}
   }
 
   function saveRemoteSoon(){
+    writeLocalState();
     if(syncing) return;
     clearTimeout(timer);
-    timer=setTimeout(saveRemoteNow,900);
+    timer=setTimeout(saveRemoteNow,500);
   }
 
   function jsonp(params){
@@ -117,6 +142,7 @@
         buildShopping({keepManual:false});
       }
       saveSession(false);
+      writeLocalState();
       renderAll();
       syncing=false;
     }catch(e){syncing=false;}
@@ -126,6 +152,7 @@
     const oldSave=saveSession;
     saveSession=function(touch=true){
       oldSave(touch);
+      writeLocalState();
       if(touch!==false) saveRemoteSoon();
     };
   }
@@ -165,7 +192,7 @@
     saveRemoteNow();
   };
 
-  try{buildShopping();renderAll();}catch(e){}
+  try{restoreLocalState();buildShopping();renderAll();}catch(e){}
 
   const urlWeek=new URLSearchParams(location.search).get('week');
   if(urlWeek){
@@ -177,6 +204,8 @@
     loadRemote(CURRENT_ID,true);
   }
 
+  window.addEventListener('pagehide',saveRemoteNow);
+  window.addEventListener('beforeunload',saveRemoteNow);
   window.addEventListener('focus',()=>loadRemote(activeWeek.id||CURRENT_ID,false));
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadRemote(activeWeek.id||CURRENT_ID,false);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRemoteNow();else loadRemote(activeWeek.id||CURRENT_ID,false);});
 })();
