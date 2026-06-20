@@ -15,13 +15,13 @@
   }
 
   function fixCategory(name,cat){
-    let n=cleanName(name).toLowerCase();
-    let veg=['citron','citroner','lime','gulerod','gulerødder','hvidløg','jordskok','jordskokker','løg','rødløg','forårsløg','persille','dild','basilikum','purløg','koriander','mynte','rosmarin','timian','salat','rucola','spinat','kål','spidskål','blomkål','broccoli','broccolli','agurk','tomat','tomater','peberfrugt','porre','porrer','kartoffel','kartofler','sød kartoffel','søde kartofler','selleri','bladselleri','champignon','svampe','squash','aubergine','græskar','æble','æbler','pære','pærer','banan','bananer','avocado'];
-    let dairy=['yoghurt','græsk yoghurt','creme fraiche','mælk','fløde','smør','ost','feta','mozzarella','parmesan','parmesanost','cheddar','æg'];
-    let dry=['pasta','ris','nudler','bulgur','couscous','linser','bønner','kikærter','mel','sukker','havregryn','olie','eddike','tomatpuré','dåsetomater'];
-    if(veg.includes(n)) return 'grøntsager og frugt';
-    if(dairy.includes(n)) return 'mælkeprodukter og pålæg';
-    if(dry.includes(n)) return 'konserves og tørvarer';
+    let n=cleanName(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    if(['havregryn','grove havregryn'].includes(n)) return 'mel og gryn';
+    if(['hakkede tomater','tomatpure','tomatpuré','kokosmælk','kokosmaelk','ris','grødris','grodris','nudler','bulgur','couscous','linser','bønner','bonner','kikærter','kikaerter','pasta','lasagneplader','suppehorn'].includes(n)) return 'konserves og tørvarer';
+    if(['blomkålsris','blomkalsris'].includes(n)) return 'frostvarer';
+    if(['spidskommen','spidskommenfrø','spidskommenfro','karry','kardemomme','stødt koriander','stodt koriander','gurkemeje','sennepsfrø','sennepsfro','krydderier','kanel','sesamfrø','sesamfro','peanuts','honning','mandler','rosiner','pinjekærner','pinjekaerner'].includes(n)) return 'mel og gryn';
+    if(['kylling'].includes(n)) return 'andet';
+    if(['pølser','pølse','polser','polse','bacon','pulled pork','pepperoni','kyllingepålæg','kyllingepalaeg'].includes(n)) return 'mælkeprodukter og pålæg';
     return cat||'andet';
   }
 
