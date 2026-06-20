@@ -47,6 +47,42 @@
     });
   }
 
+  if(typeof buildShopping==='function'){
+    buildShopping=function(opts={}){
+      let keepManual=opts.keepManual!==false;
+      let manual=keepManual?shopping.filter(i=>(i.source==='manuelt'||i.source==='ekstra')&&i.name).map(i=>({
+        id:i.id||id(),name:cleanName(i.name),category:i.category||'andet',qty:Number(i.qty)||1,on:i.on!==false,source:'manuelt'
+      })):[];
+      let m={};
+      function add(name,cat,qty=1,source='ret'){
+        name=cleanName(name);cat=cat||'andet';
+        let key=source+'|'+cat+'|'+name.toLowerCase();
+        if(!m[key])m[key]={id:id(),name,category:cat,qty:0,on:true,source};
+        m[key].qty+=qty;
+      }
+      plan.map(byId).forEach((r,di)=>(r.ingredients||[]).forEach(i=>{if(ingOn(di,i))add(i.name,i.category,1,'ret')}));
+      STANDARD.forEach(i=>add(i.name,i.category,i.qty,'standard'));
+      manual.forEach(i=>{let key='manuelt|'+i.category+'|'+i.name.toLowerCase();if(!m[key])m[key]=i;else m[key].qty+=i.qty});
+      shopping=Object.values(m).sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||a.source.localeCompare(b.source,'da')||a.name.localeCompare(b.name,'da'));
+    };
+  }
+
+  if(typeof itemRow==='function'){
+    itemRow=function(i){
+      return '<div class="item"><button class="check '+(i.on?'on':'')+'" data-toggle="'+i.id+'">'+(i.on?'✓':'')+'</button><div><b>'+esc(i.name)+'</b><div class="sub" style="margin:2px 0 0">'+esc(sourceLabel(i.source))+'</div></div><div class="qty"><button data-minus="'+i.id+'">−</button><span>'+i.qty+'</span><button data-plus="'+i.id+'">+</button></div></div>';
+    };
+  }
+
+  if(typeof addItem==='function'){
+    addItem=function(cat,name){
+      name=cleanName(name);
+      let found=shopping.find(i=>i.category===cat&&i.name.toLowerCase()===name.toLowerCase()&&(i.source==='manuelt'||i.source==='ekstra'));
+      if(found){found.qty++;found.on=true;found.source='manuelt'}
+      else shopping.push({id:id(),name,category:cat,qty:1,on:true,source:'manuelt'});
+      saveSession();renderList();renderPrint();
+    };
+  }
+
   async function loadRemote(weekId,force){
     try{
       if(!weekId || syncing) return;
@@ -110,6 +146,8 @@
       saveRemoteNow();
     };
   }
+
+  try{buildShopping();renderAll();}catch(e){}
 
   const urlWeek=new URLSearchParams(location.search).get('week');
   if(urlWeek){
