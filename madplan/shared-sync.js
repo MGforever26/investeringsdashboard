@@ -14,13 +14,25 @@
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
   }
 
+  function fixCategory(name,cat){
+    let n=cleanName(name).toLowerCase();
+    let veg=['citron','citroner','lime','gulerod','gulerødder','hvidløg','jordskok','jordskokker','løg','rødløg','forårsløg','persille','dild','basilikum','purløg','koriander','mynte','rosmarin','timian','salat','rucola','spinat','kål','spidskål','blomkål','broccoli','broccolli','agurk','tomat','tomater','peberfrugt','porre','porrer','kartoffel','kartofler','sød kartoffel','søde kartofler','selleri','bladselleri','champignon','svampe','squash','aubergine','græskar','æble','æbler','pære','pærer','banan','bananer','avocado'];
+    let dairy=['yoghurt','græsk yoghurt','creme fraiche','mælk','fløde','smør','ost','feta','mozzarella','parmesan','parmesanost','cheddar','æg'];
+    let dry=['pasta','ris','nudler','bulgur','couscous','linser','bønner','kikærter','mel','sukker','havregryn','olie','eddike','tomatpuré','dåsetomater'];
+    if(veg.includes(n)) return 'grøntsager og frugt';
+    if(dairy.includes(n)) return 'mælkeprodukter og pålæg';
+    if(dry.includes(n)) return 'konserves og tørvarer';
+    return cat||'andet';
+  }
+
   function shoppingKey(name,cat,source){
     source=source==='ekstra'?'manuelt':(source||'ret');
-    return source+'|'+(cat||'andet')+'|'+cleanName(name).toLowerCase();
+    cat=fixCategory(name,cat);
+    return source+'|'+cat+'|'+cleanName(name).toLowerCase();
   }
 
   function shoppingSnapshot(){
-    try{return shopping.map(i=>[i.name,Math.max(0,CATS.indexOf(i.category||'andet')),i.source==='ekstra'?'manuelt':(i.source||'ret'),Number(i.qty)||1,i.on!==false]);}
+    try{return shopping.map(i=>[i.name,Math.max(0,CATS.indexOf(fixCategory(i.name,i.category)||'andet')),i.source==='ekstra'?'manuelt':(i.source||'ret'),Number(i.qty)||1,i.on!==false]);}
     catch(e){return []}
   }
 
@@ -31,9 +43,10 @@
       let map={};
       arr.forEach(x=>{
         let name=x[0],cat=typeof x[1]==='number'?(CATS[x[1]]||'andet'):(x[1]||'andet'),source=x[2]==='ekstra'?'manuelt':(x[2]||'ret');
+        cat=fixCategory(name,cat);
         map[shoppingKey(name,cat,source)]={qty:Number(x[3])||1,on:x[4]!==false};
       });
-      shopping.forEach(i=>{let v=map[shoppingKey(i.name,i.category,i.source)];if(v){i.qty=v.qty;i.on=v.on;}});
+      shopping.forEach(i=>{i.category=fixCategory(i.name,i.category);let v=map[shoppingKey(i.name,i.category,i.source)];if(v){i.qty=v.qty;i.on=v.on;}});
     }catch(e){}
   }
 
@@ -59,7 +72,7 @@
       shopping=[]; pendingShopping=null;
       applyState(data);
       if(pendingShopping){
-        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:i.category,qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
+        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
         pendingShopping=null;
         buildShopping();
       }else buildShopping();
@@ -120,11 +133,11 @@
       let keepManual=opts.keepManual!==false;
       let prior=keepManual?shoppingSnapshot():[];
       let manual=keepManual?shopping.filter(i=>(i.source==='manuelt'||i.source==='ekstra')&&i.name).map(i=>({
-        id:i.id||id(),name:cleanName(i.name),category:i.category||'andet',qty:Number(i.qty)||1,on:i.on!==false,source:'manuelt'
-      })):[];
+        id:i.id||id(),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:'manuelt'
+      })) : [];
       let m={};
       function add(name,cat,qty=1,source='ret'){
-        name=cleanName(name);cat=cat||'andet';
+        name=cleanName(name);cat=fixCategory(name,cat||'andet');
         let key=shoppingKey(name,cat,source);
         if(!m[key])m[key]={id:id(),name,category:cat,qty:0,on:true,source};
         m[key].qty+=qty;
@@ -139,13 +152,14 @@
 
   if(typeof itemRow==='function'){
     itemRow=function(i){
+      i.category=fixCategory(i.name,i.category);
       return '<div class="item"><button class="check '+(i.on?'on':'')+'" data-toggle="'+i.id+'">'+(i.on?'✓':'')+'</button><div><b>'+esc(i.name)+'</b><div class="sub" style="margin:2px 0 0">'+esc(sourceLabel(i.source))+'</div></div><div class="qty"><button data-minus="'+i.id+'">−</button><span>'+i.qty+'</span><button data-plus="'+i.id+'">+</button></div></div>';
     };
   }
 
   if(typeof addItem==='function'){
     addItem=function(cat,name){
-      name=cleanName(name);
+      name=cleanName(name);cat=fixCategory(name,cat);
       let found=shopping.find(i=>i.category===cat&&i.name.toLowerCase()===name.toLowerCase()&&(i.source==='manuelt'||i.source==='ekstra'));
       if(found){found.qty++;found.on=true;found.source='manuelt'}
       else shopping.push({id:id(),name,category:cat,qty:1,on:true,source:'manuelt'});
@@ -170,7 +184,7 @@
       if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
       localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
       if(pendingShopping){
-        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:i.category,qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
+        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
         pendingShopping=null;
         buildShopping();
       }else{
