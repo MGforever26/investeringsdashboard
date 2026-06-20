@@ -14,6 +14,38 @@
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
   }
 
+  function shoppingKey(name,cat,source){
+    source=source==='ekstra'?'manuelt':(source||'ret');
+    return source+'|'+(cat||'andet')+'|'+cleanName(name).toLowerCase();
+  }
+
+  function shoppingSnapshot(){
+    try{return shopping.map(i=>[i.name,Math.max(0,CATS.indexOf(i.category||'andet')),i.source==='ekstra'?'manuelt':(i.source||'ret'),Number(i.qty)||1,i.on!==false]);}
+    catch(e){return []}
+  }
+
+  function applyShoppingSnapshot(data){
+    try{
+      let arr=(data&&Array.isArray(data.sx))?data.sx:[];
+      if(!arr.length) return;
+      let map={};
+      arr.forEach(x=>{
+        let name=x[0],cat=typeof x[1]==='number'?(CATS[x[1]]||'andet'):(x[1]||'andet'),source=x[2]==='ekstra'?'manuelt':(x[2]||'ret');
+        map[shoppingKey(name,cat,source)]={qty:Number(x[3])||1,on:x[4]!==false};
+      });
+      shopping.forEach(i=>{let v=map[shoppingKey(i.name,i.category,i.source)];if(v){i.qty=v.qty;i.on=v.on;}});
+    }catch(e){}
+  }
+
+  if(typeof stateObj==='function'){
+    const oldStateObj=stateObj;
+    stateObj=function(){
+      let o=oldStateObj();
+      try{o.sx=shoppingSnapshot();}catch(e){}
+      return o;
+    };
+  }
+
   function writeLocalState(){
     try{if(typeof stateObj==='function') localStorage.setItem(LOCAL_STATE_KEY,JSON.stringify(stateObj()));}catch(e){}
   }
@@ -31,6 +63,7 @@
         pendingShopping=null;
         buildShopping();
       }else buildShopping();
+      applyShoppingSnapshot(data);
       renderAll();
       return true;
     }catch(e){return false;}
@@ -85,20 +118,22 @@
   if(typeof buildShopping==='function'){
     buildShopping=function(opts={}){
       let keepManual=opts.keepManual!==false;
+      let prior=keepManual?shoppingSnapshot():[];
       let manual=keepManual?shopping.filter(i=>(i.source==='manuelt'||i.source==='ekstra')&&i.name).map(i=>({
         id:i.id||id(),name:cleanName(i.name),category:i.category||'andet',qty:Number(i.qty)||1,on:i.on!==false,source:'manuelt'
       })):[];
       let m={};
       function add(name,cat,qty=1,source='ret'){
         name=cleanName(name);cat=cat||'andet';
-        let key=source+'|'+cat+'|'+name.toLowerCase();
+        let key=shoppingKey(name,cat,source);
         if(!m[key])m[key]={id:id(),name,category:cat,qty:0,on:true,source};
         m[key].qty+=qty;
       }
       plan.map(byId).forEach((r,di)=>(r.ingredients||[]).forEach(i=>{if(ingOn(di,i))add(i.name,i.category,1,'ret')}));
       STANDARD.forEach(i=>add(i.name,i.category,i.qty,'standard'));
-      manual.forEach(i=>{let key='manuelt|'+i.category+'|'+i.name.toLowerCase();if(!m[key])m[key]=i;else m[key].qty+=i.qty});
+      manual.forEach(i=>{let key=shoppingKey(i.name,i.category,'manuelt');if(!m[key])m[key]=i;else m[key].qty+=i.qty});
       shopping=Object.values(m).sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||a.source.localeCompare(b.source,'da')||a.name.localeCompare(b.name,'da'));
+      applyShoppingSnapshot({sx:prior});
     };
   }
 
@@ -141,6 +176,7 @@
       }else{
         buildShopping({keepManual:false});
       }
+      applyShoppingSnapshot(data.week.payload);
       saveSession(false);
       writeLocalState();
       renderAll();
