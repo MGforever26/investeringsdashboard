@@ -1,7 +1,17 @@
 (function(){
   const API='https://script.google.com/macros/s/AKfycbzJyz-EbpidFmHsylCUqJ16uuDPHWUDfQde2bcOwYs6egreJwKqeKsYUshl8ov7RnA/exec';
+  const CURRENT_ID='madplan-faelles-aktiv';
   if(!API) return;
   let syncing=false,timer=null;
+
+  function currentLabel(){
+    try{return 'Uge '+isoWeek().w}catch(e){return (activeWeek&&activeWeek.label)||'Uge'}
+  }
+
+  function useCurrentPlanId(){
+    activeWeek=Object.assign({},activeWeek||{}, {id:CURRENT_ID,label:currentLabel()});
+    try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
+  }
 
   function saveRemoteNow(){
     try{
@@ -97,6 +107,7 @@
       pendingShopping=null;
       applyState(data.week.payload);
       activeWeek=Object.assign({},data.week.payload.w||activeWeek,{id:data.week.id||weekId,updatedAt:data.week.updatedAt||new Date().toISOString()});
+      if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
       localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
       if(pendingShopping){
         shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:i.category,qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
@@ -123,7 +134,7 @@
     shareWeek=async function(){
       saveSession();
       saveRemoteNow();
-      let longLink=location.origin+location.pathname+'?week='+encodeURIComponent(activeWeek.id);
+      let longLink=location.origin+location.pathname+'?week='+encodeURIComponent(activeWeek.id||CURRENT_ID);
       let link=longLink;
       try{
         let r=await fetch('https://tinyurl.com/api-create.php?url='+encodeURIComponent(longLink));
@@ -139,13 +150,20 @@
     };
   }
 
-  if(typeof startNewWeek==='function'){
-    const oldStart=startNewWeek;
-    startNewWeek=function(){
-      oldStart();
-      saveRemoteNow();
-    };
-  }
+  startNewWeek=function(){
+    if(!confirm('Start ny uge? Den aktuelle madplan og manuelt tilføjede varer ryddes for jer begge.')) return;
+    activeWeek=newWeekMeta();
+    activeWeek.id=CURRENT_ID;
+    activeWeek.label=currentLabel();
+    activeWeek.updatedAt=new Date().toISOString();
+    try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
+    plan=[]; excluded={}; shopping=[]; pendingShopping=null;
+    generatePlan();
+    buildShopping({keepManual:false});
+    saveSession();
+    renderAll();
+    saveRemoteNow();
+  };
 
   try{buildShopping();renderAll();}catch(e){}
 
@@ -155,9 +173,10 @@
     localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
     loadRemote(urlWeek,true);
   }else{
-    saveRemoteSoon();
+    useCurrentPlanId();
+    loadRemote(CURRENT_ID,true);
   }
 
-  window.addEventListener('focus',()=>loadRemote(activeWeek.id,false));
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadRemote(activeWeek.id,false);});
+  window.addEventListener('focus',()=>loadRemote(activeWeek.id||CURRENT_ID,false));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadRemote(activeWeek.id||CURRENT_ID,false);});
 })();
