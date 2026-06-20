@@ -26,6 +26,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
     var res=await fetch(src,{cache:'no-store'});
     if(!res.ok) throw new Error('Kunne ikke hente appen');
     var html=await res.text();
+    var oldShare="async function shareWeek(){saveSession();let link=location.origin+location.pathname+'#uge='+enc(stateObj());try{if(navigator.share){await navigator.share({title:'Madplan',text:'Her er ugens madplan',url:link});return}await navigator.clipboard.writeText(link);alert('Del uge-linket er kopieret. Send det til hende.')}catch(e){prompt('Kopiér Del uge-linket:',link)}}";
+    var newShare="async function shareWeek(){saveSession();let link=location.origin+location.pathname+'#uge='+enc(stateObj());let msg='Her er ugens madplan:\\n'+link;try{if(navigator.share){await navigator.share({title:'Madplan',text:msg,url:link});return}await navigator.clipboard.writeText(msg);alert('Del uge-linket er kopieret. Send det til hende.')}catch(e){prompt('Kopiér Del uge-linket:',msg)}}";
+    html=html.replace(oldShare,newShare);
     document.open();
     document.write(html);
     document.close();
