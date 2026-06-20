@@ -11,12 +11,14 @@
 
     let veg=['citron','lime','gulerod','gulerodder','hvidlog','jordskok','log','rodlog','forarslog','porre','persille','dild','basilikum','purlog','koriander','mynte','rosmarin','timian','salat','rucola','spinat','kal','spidskal','blomkal','broccoli','agurk','tomat','peberfrugt','kartoffel','selleri','bladselleri','champignon','svamp','squash','aubergine','graeskar','graskar','aeble','aebler','paere','paerer','banan','avocado'];
     let dairy=['yoghurt','græsk yoghurt','graesk yoghurt','creme fraiche','mælk','maelk','fløde','flode','smør','smor','ost','feta','mozzarella','parmesan','cheddar','æg','aeg'];
+    let grain=['havregryn','grove havregryn','gryn','mel','rugmel','fuldkornsmel','chiafro','chiafrø','knækbrød','knaekbrod','flager','riskiks','majskiks','rugkerner','solsikkekerner','hørfrø','horfro','hasselnødder','hasselnodder','mandler','peanuts','rosiner','figenstænger','figenstaenger','ahornsirup','honning'];
     let dry=['ris','nudler','bulgur','couscous','linser','bønner','bonner','kikærter','kikaerter','tomatpure','dåsetomat','dasetomat','pasta tør','tør pasta','tor pasta'];
     let bread=['rugbrød','rugbrod','boller','pitabrød','pitabrod','brød','brod'];
     let frozen=['frossen','frosne'];
 
     if(hasAny(n,veg)) return 'grøntsager og frugt';
     if(hasAny(n,dairy)) return 'mælkeprodukter og pålæg';
+    if(hasAny(n,grain)) return 'mel og gryn';
     if(hasAny(n,bread)) return 'brød';
     if(hasAny(n,frozen)) return 'frostvarer';
     if(hasAny(n,dry)) return 'konserves og tørvarer';
