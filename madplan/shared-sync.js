@@ -9,21 +9,33 @@
     try{return 'Uge '+isoWeek().w}catch(e){return (activeWeek&&activeWeek.label)||'Uge'}
   }
 
+  function saveWeekMeta(){
+    try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
+  }
+
+  function markChanged(){
+    try{
+      const now=new Date().toISOString();
+      activeWeek=Object.assign({},activeWeek||{}, {changedAt:now, updatedAt:now});
+      dirty=true;
+      saveWeekMeta();
+    }catch(e){dirty=true;}
+  }
+
   function markSaved(ts,editor){
     try{
-      activeWeek=Object.assign({},activeWeek||{}, {savedAt:new Date().toISOString(), updatedAt:ts||((activeWeek&&activeWeek.updatedAt)||null), lastEditor:editor||((activeWeek&&activeWeek.lastEditor)||'app')});
-      localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
+      activeWeek=Object.assign({},activeWeek||{}, {savedAt:ts||new Date().toISOString(), lastEditor:editor||((activeWeek&&activeWeek.lastEditor)||'app')});
+      saveWeekMeta();
     }catch(e){}
   }
 
   if(typeof touchWeek==='function'){
-    const oldTouchWeek=touchWeek;
-    touchWeek=function(){oldTouchWeek();dirty=true;};
+    touchWeek=function(){markChanged();};
   }
 
   function useCurrentPlanId(){
     activeWeek=Object.assign({},activeWeek||{}, {id:CURRENT_ID,label:currentLabel()});
-    try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
+    saveWeekMeta();
   }
 
   function fixCategory(name,cat){
@@ -67,7 +79,7 @@
     stateObj=function(){
       let o=oldStateObj();
       try{o.sx=shoppingSnapshot();}catch(e){}
-      try{o.w={id:(activeWeek&&activeWeek.id)||CURRENT_ID,label:(activeWeek&&activeWeek.label)||currentLabel(),updatedAt:(activeWeek&&activeWeek.updatedAt)||null,savedAt:(activeWeek&&activeWeek.savedAt)||null,lastEditor:(activeWeek&&activeWeek.lastEditor)||null};}catch(e){}
+      try{o.w={id:(activeWeek&&activeWeek.id)||CURRENT_ID,label:(activeWeek&&activeWeek.label)||currentLabel(),changedAt:(activeWeek&&activeWeek.changedAt)||null,updatedAt:(activeWeek&&activeWeek.changedAt)||null,savedAt:(activeWeek&&activeWeek.savedAt)||null,lastEditor:(activeWeek&&activeWeek.lastEditor)||null};}catch(e){}
       return o;
     };
   }
@@ -84,7 +96,7 @@
       if(!data) return false;
       shopping=[]; pendingShopping=null;
       applyState(data);
-      if(data.w) activeWeek=Object.assign({},activeWeek||{},data.w);
+      if(data.w) activeWeek=Object.assign({},activeWeek||{},data.w,{changedAt:data.w.changedAt||data.w.updatedAt||null});
       if(pendingShopping){
         shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
         pendingShopping=null;
@@ -101,18 +113,18 @@
       writeLocalState();
       if(!activeWeek || !activeWeek.id || typeof stateObj!=='function') return;
       if(!force && !dirty) return;
-      const changeAt=(activeWeek&&activeWeek.updatedAt)||new Date().toISOString();
+      const changedAt=(activeWeek&&activeWeek.changedAt)||new Date().toISOString();
       const editor=(localStorage.getItem('madplan_editor_name')||'app').trim()||'app';
-      markSaved(changeAt,editor);
       const body=new URLSearchParams({
         action:'save',
         id:activeWeek.id,
-        version:changeAt,
+        version:changedAt,
         payload:JSON.stringify(stateObj()),
         lastEditor:editor,
         note:activeWeek.label||''
       });
       dirty=false;
+      markSaved(new Date().toISOString(),editor);
       fetch(API,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
     }catch(e){}
   }
@@ -191,20 +203,19 @@
       if(!weekId || syncing) return;
       const data=await jsonp({action:'get',id:weekId});
       if(!data || !data.ok || !data.found || !data.week || !data.week.payload){
-        if(force) saveRemoteNow(true);
         return;
       }
       let remoteMeta=data.week.payload.w||{};
-      let remoteChanged=remoteMeta.updatedAt||data.week.version||data.week.updatedAt||null;
-      let localChanged=(activeWeek&&activeWeek.updatedAt)||null;
+      let remoteChanged=remoteMeta.changedAt||remoteMeta.updatedAt||data.week.version||data.week.updatedAt||null;
+      let localChanged=(activeWeek&&activeWeek.changedAt)||null;
       if(!force && localChanged && remoteChanged && new Date(remoteChanged)<=new Date(localChanged)) return;
       syncing=true;
       shopping=[];
       pendingShopping=null;
       applyState(data.week.payload);
-      activeWeek=Object.assign({},activeWeek||{},remoteMeta,{id:data.week.id||weekId,updatedAt:remoteChanged,savedAt:remoteMeta.savedAt||data.week.updatedAt||null,lastEditor:data.week.lastEditor||remoteMeta.lastEditor||'app'});
+      activeWeek=Object.assign({},activeWeek||{},remoteMeta,{id:data.week.id||weekId,changedAt:remoteChanged,updatedAt:remoteChanged,savedAt:remoteMeta.savedAt||data.week.updatedAt||null,lastEditor:data.week.lastEditor||remoteMeta.lastEditor||'app'});
       if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
-      localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
+      saveWeekMeta();
       if(pendingShopping){
         shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
         pendingShopping=null;
@@ -251,14 +262,16 @@
 
   startNewWeek=function(){
     if(!confirm('Start ny uge? Den aktuelle madplan og manuelt tilføjede varer ryddes for jer begge.')) return;
+    const now=new Date().toISOString();
     activeWeek=newWeekMeta();
     activeWeek.id=CURRENT_ID;
     activeWeek.label=currentLabel();
-    activeWeek.updatedAt=new Date().toISOString();
+    activeWeek.changedAt=now;
+    activeWeek.updatedAt=now;
     activeWeek.savedAt=null;
     activeWeek.lastEditor=null;
     dirty=true;
-    try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
+    saveWeekMeta();
     plan=[]; excluded={}; shopping=[]; pendingShopping=null;
     generatePlan();
     buildShopping({keepManual:false});
@@ -272,7 +285,7 @@
   const urlWeek=new URLSearchParams(location.search).get('week');
   if(urlWeek){
     activeWeek=Object.assign({},activeWeek,{id:urlWeek});
-    localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
+    saveWeekMeta();
     loadRemote(urlWeek,true);
   }else{
     useCurrentPlanId();
