@@ -27,9 +27,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
     if(!res.ok) throw new Error('Kunne ikke hente appen');
     var html=await res.text();
     var patches=[
-      ['data-tab="print">PDF</button>','data-tab="print">Overblik</button>'],
-      ['onclick="setTab(\'print\')">Vis/PDF →','onclick="setTab(\'print\')">Overblik →'],
-      ['<h2>Visning og PDF</h2><p class="sub">Download PDF, åbn PDF eller del den aktuelle uge som link.</p>','<h2>Overblik</h2><p class="sub">Valgte retter, indkøbsliste, deling og PDF.</p>'],
+      ['data-tab="print">PDF</button>','data-tab="print">Indkøbsliste</button>'],
+      ['onclick="setTab(\'print\')">Vis/PDF →','onclick="setTab(\'print\')">Indkøbsliste →'],
+      ['<h2>Visning og PDF</h2><p class="sub">Download PDF, åbn PDF eller del den aktuelle uge som link.</p>','<h2>PDF og deling</h2><p class="sub">Download PDF, åbn PDF eller del den aktuelle uge som link.</p>'],
       ['onclick="buildShopping();saveSession();renderAll()">Nulstil listen','onclick="buildShopping({keepManual:false});saveSession();renderAll()">Nulstil indkøbsliste'],
       ['el.innerHTML=`<div class="card"><h2>Ugens madplan','el.innerHTML=weekTop()+`<div class="card"><h2>Ugens madplan']
     ];
@@ -43,12 +43,13 @@ function deviceName(){return (localStorage.getItem('madplan_editor_name')||'').t
 function ensureDeviceName(){try{if(deviceName()||localStorage.getItem('madplan_editor_name_skipped'))return;let name=prompt('Hvem bruger denne enhed? Navnet bruges kun til at vise, hvem der senest ændrede madplanen. Fx Michael eller Louise.','');if(name&&String(name).trim()){localStorage.setItem('madplan_editor_name',String(name).trim())}else{localStorage.setItem('madplan_editor_name_skipped','1')}if(typeof renderAll==='function')renderAll()}catch(e){}}
 setTimeout(ensureDeviceName,1200);
 function formatDateTime(x){try{return x?new Date(x).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'ikke ændret endnu'}catch{return 'ukendt'}}
-function weekTop(){let changed=activeWeek.changedAt||activeWeek.updatedAt||null;let editor=(activeWeek.lastEditor&&activeWeek.lastEditor!=='app')?' af '+esc(activeWeek.lastEditor):'';return '<div class="card no-print"><h2>'+esc(activeWeek.label||'Uge')+'</h2><p class="sub">Senest ændret '+formatDateTime(changed)+editor+'</p><div class="row" style="margin-top:12px"><button class="btn secondary" onclick="startNewWeek()">Start ny uge</button><button class="btn" onclick="shareWeek()">Del uge</button></div></div>'}
+function weekTop(){let changed=activeWeek.changedAt||activeWeek.updatedAt||null;let editor=(activeWeek.lastEditor&&activeWeek.lastEditor!=='app')?' af '+esc(activeWeek.lastEditor):'';return '<div class="card no-print"><h2>'+esc(activeWeek.label||'Uge')+'</h2><p class="sub">Senest ændret '+formatDateTime(changed)+editor+'</p><div class="row" style="margin-top:12px"><button class="btn secondary" onclick="startNewWeek()">Start ny uge</button></div></div>'}
 function sourceLabel(s){s=s==='ekstra'?'manuelt':s;return s==='ret'?'Ret':s==='standard'?'Standard':s==='manuelt'?'Manuelt':cap(s||'Manuelt')}
 `;
     html=html.replace('const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};','const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};'+helper);
     html=html.replace('function saveSession(){sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}','function saveSession(touch=true){if(touch!==false)touchWeek();else store.set(\'madplan_week_meta_v1\',activeWeek);sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}');
-    html=html.replace('</body>','<scr'+'ipt src="shared-sync.js?v=11"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=6"></scr'+'ipt></body>');
+    var printFooterPatch='<scr'+'ipt>(function(){try{var oldRenderPrint=renderPrint;renderPrint=function(){oldRenderPrint();var p=document.querySelector("#print");if(!p)return;var card=p.querySelector(".card.no-print");if(card){var h=card.querySelector("h2");if(h)h.textContent="PDF og deling";var sub=card.querySelector(".sub");if(sub)sub.textContent="Download PDF, åbn PDF eller del den aktuelle uge som link.";p.appendChild(card);}};renderPrint();}catch(e){}})();</scr'+'ipt>';
+    html=html.replace('</body>',printFooterPatch+'<scr'+'ipt src="shared-sync.js?v=11"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=6"></scr'+'ipt></body>');
     document.open();document.write(html);document.close();
   }catch(e){document.body.innerHTML='<div class="card"><h1>Madplan kunne ikke åbnes</h1><p>Prøv at genindlæse siden.</p><p class="muted">Fejl: '+String(e.message||e)+'</p></div>'}
 })();
