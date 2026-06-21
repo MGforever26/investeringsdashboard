@@ -9,6 +9,13 @@
     try{return 'Uge '+isoWeek().w}catch(e){return (activeWeek&&activeWeek.label)||'Uge'}
   }
 
+  function markSaved(ts,editor){
+    try{
+      activeWeek=Object.assign({},activeWeek||{}, {savedAt:ts||new Date().toISOString(), lastEditor:editor||((activeWeek&&activeWeek.lastEditor)||'app')});
+      localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
+    }catch(e){}
+  }
+
   function useCurrentPlanId(){
     activeWeek=Object.assign({},activeWeek||{}, {id:CURRENT_ID,label:currentLabel()});
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
@@ -86,12 +93,15 @@
     try{
       writeLocalState();
       if(!activeWeek || !activeWeek.id || typeof stateObj!=='function') return;
+      const now=new Date().toISOString();
+      const editor=(localStorage.getItem('madplan_editor_name')||'app').trim()||'app';
+      markSaved(now,editor);
       const body=new URLSearchParams({
         action:'save',
         id:activeWeek.id,
-        version:new Date().toISOString(),
+        version:now,
         payload:JSON.stringify(stateObj()),
-        lastEditor:'app',
+        lastEditor:editor,
         note:activeWeek.label||''
       });
       fetch(API,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
@@ -175,12 +185,13 @@
         if(force) saveRemoteNow();
         return;
       }
-      if(!force && activeWeek.updatedAt && data.week.updatedAt && new Date(data.week.updatedAt)<=new Date(activeWeek.updatedAt)) return;
+      let localSaved=(activeWeek&&activeWeek.savedAt)||null;
+      if(!force && localSaved && data.week.updatedAt && new Date(data.week.updatedAt)<=new Date(localSaved)) return;
       syncing=true;
       shopping=[];
       pendingShopping=null;
       applyState(data.week.payload);
-      activeWeek=Object.assign({},data.week.payload.w||activeWeek,{id:data.week.id||weekId,updatedAt:data.week.updatedAt||new Date().toISOString()});
+      activeWeek=Object.assign({},data.week.payload.w||activeWeek,{id:data.week.id||weekId,updatedAt:data.week.updatedAt||new Date().toISOString(),savedAt:data.week.updatedAt||null,lastEditor:data.week.lastEditor||'app'});
       if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
       localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
       if(pendingShopping){
@@ -233,6 +244,8 @@
     activeWeek.id=CURRENT_ID;
     activeWeek.label=currentLabel();
     activeWeek.updatedAt=new Date().toISOString();
+    activeWeek.savedAt=null;
+    activeWeek.lastEditor=null;
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
     plan=[]; excluded={}; shopping=[]; pendingShopping=null;
     generatePlan();
