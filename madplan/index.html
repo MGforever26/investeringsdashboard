@@ -36,16 +36,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-s
     patches.forEach(function(p){html=html.replace(p[0],p[1]);});
     var helper = `
 function isoWeek(d=new Date()){d=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));let day=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-day);let y=d.getUTCFullYear(),start=new Date(Date.UTC(y,0,1));let w=Math.ceil((((d-start)/86400000)+1)/7);return {y,w}}
-function newWeekMeta(){let w=isoWeek();return {id:'uge-'+w.y+'-'+String(w.w).padStart(2,'0')+'-'+id(),label:'Uge '+w.w,updatedAt:new Date().toISOString()}}
+function newWeekMeta(){let w=isoWeek();return {id:'uge-'+w.y+'-'+String(w.w).padStart(2,'0')+'-'+id(),label:'Uge '+w.w,updatedAt:null,savedAt:null,lastEditor:null}}
 let activeWeek=store.get('madplan_week_meta_v1',null)||newWeekMeta();
 function touchWeek(){activeWeek.updatedAt=new Date().toISOString();store.set('madplan_week_meta_v1',activeWeek)}
-function timeOnly(x){try{return new Date(x).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}catch{return '--:--'}}
-function weekTop(){return '<div class="card no-print"><h2>'+esc(activeWeek.label||'Uge')+'</h2><p class="sub">Senest opdateret '+timeOnly(activeWeek.updatedAt)+'</p><div class="row" style="margin-top:12px"><button class="btn secondary" onclick="startNewWeek()">Start ny uge</button><button class="btn" onclick="shareWeek()">Del uge</button></div></div>'}
+function formatSavedAt(x){try{return x?new Date(x).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'ikke gemt endnu'}catch{return 'ukendt'}}
+function weekTop(){let saved=activeWeek.savedAt||null;let editor=(activeWeek.lastEditor&&activeWeek.lastEditor!=='app')?' af '+esc(activeWeek.lastEditor):'';return '<div class="card no-print"><h2>'+esc(activeWeek.label||'Uge')+'</h2><p class="sub">Senest gemt '+formatSavedAt(saved)+editor+'</p><div class="row" style="margin-top:12px"><button class="btn secondary" onclick="startNewWeek()">Start ny uge</button><button class="btn" onclick="shareWeek()">Del uge</button></div></div>'}
 function sourceLabel(s){s=s==='ekstra'?'manuelt':s;return s==='ret'?'Ret':s==='standard'?'Standard':s==='manuelt'?'Manuelt':cap(s||'Manuelt')}
 `;
     html=html.replace('const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};','const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};'+helper);
     html=html.replace('function saveSession(){sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}','function saveSession(touch=true){if(touch!==false)touchWeek();else store.set(\'madplan_week_meta_v1\',activeWeek);sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}');
-    html=html.replace('</body>','<scr'+'ipt src="shared-sync.js?v=7"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=6"></scr'+'ipt></body>');
+    html=html.replace('</body>','<scr'+'ipt src="shared-sync.js?v=8"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=6"></scr'+'ipt></body>');
     document.open();document.write(html);document.close();
   }catch(e){document.body.innerHTML='<div class="card"><h1>Madplan kunne ikke åbnes</h1><p>Prøv at genindlæse siden.</p><p class="muted">Fejl: '+String(e.message||e)+'</p></div>'}
 })();
