@@ -3,7 +3,7 @@
   const CURRENT_ID='madplan-faelles-aktiv';
   const LOCAL_STATE_KEY='madplan_state_local_v1';
   if(!API) return;
-  let syncing=false,timer=null;
+  let syncing=false,timer=null,dirty=false;
 
   function currentLabel(){
     try{return 'Uge '+isoWeek().w}catch(e){return (activeWeek&&activeWeek.label)||'Uge'}
@@ -11,9 +11,14 @@
 
   function markSaved(ts,editor){
     try{
-      activeWeek=Object.assign({},activeWeek||{}, {savedAt:ts||new Date().toISOString(), lastEditor:editor||((activeWeek&&activeWeek.lastEditor)||'app')});
+      activeWeek=Object.assign({},activeWeek||{}, {savedAt:new Date().toISOString(), updatedAt:ts||((activeWeek&&activeWeek.updatedAt)||null), lastEditor:editor||((activeWeek&&activeWeek.lastEditor)||'app')});
       localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
     }catch(e){}
+  }
+
+  if(typeof touchWeek==='function'){
+    const oldTouchWeek=touchWeek;
+    touchWeek=function(){oldTouchWeek();dirty=true;};
   }
 
   function useCurrentPlanId(){
@@ -62,6 +67,7 @@
     stateObj=function(){
       let o=oldStateObj();
       try{o.sx=shoppingSnapshot();}catch(e){}
+      try{o.w={id:(activeWeek&&activeWeek.id)||CURRENT_ID,label:(activeWeek&&activeWeek.label)||currentLabel(),updatedAt:(activeWeek&&activeWeek.updatedAt)||null,savedAt:(activeWeek&&activeWeek.savedAt)||null,lastEditor:(activeWeek&&activeWeek.lastEditor)||null};}catch(e){}
       return o;
     };
   }
@@ -78,6 +84,7 @@
       if(!data) return false;
       shopping=[]; pendingShopping=null;
       applyState(data);
+      if(data.w) activeWeek=Object.assign({},activeWeek||{},data.w);
       if(pendingShopping){
         shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
         pendingShopping=null;
@@ -89,21 +96,23 @@
     }catch(e){return false;}
   }
 
-  function saveRemoteNow(){
+  function saveRemoteNow(force=false){
     try{
       writeLocalState();
       if(!activeWeek || !activeWeek.id || typeof stateObj!=='function') return;
-      const now=new Date().toISOString();
+      if(!force && !dirty) return;
+      const changeAt=(activeWeek&&activeWeek.updatedAt)||new Date().toISOString();
       const editor=(localStorage.getItem('madplan_editor_name')||'app').trim()||'app';
-      markSaved(now,editor);
+      markSaved(changeAt,editor);
       const body=new URLSearchParams({
         action:'save',
         id:activeWeek.id,
-        version:now,
+        version:changeAt,
         payload:JSON.stringify(stateObj()),
         lastEditor:editor,
         note:activeWeek.label||''
       });
+      dirty=false;
       fetch(API,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
     }catch(e){}
   }
@@ -112,7 +121,7 @@
     writeLocalState();
     if(syncing) return;
     clearTimeout(timer);
-    timer=setTimeout(saveRemoteNow,500);
+    timer=setTimeout(()=>saveRemoteNow(false),500);
   }
 
   function jsonp(params){
@@ -182,16 +191,18 @@
       if(!weekId || syncing) return;
       const data=await jsonp({action:'get',id:weekId});
       if(!data || !data.ok || !data.found || !data.week || !data.week.payload){
-        if(force) saveRemoteNow();
+        if(force) saveRemoteNow(true);
         return;
       }
-      let localSaved=(activeWeek&&activeWeek.savedAt)||null;
-      if(!force && localSaved && data.week.updatedAt && new Date(data.week.updatedAt)<=new Date(localSaved)) return;
+      let remoteMeta=data.week.payload.w||{};
+      let remoteChanged=remoteMeta.updatedAt||data.week.version||data.week.updatedAt||null;
+      let localChanged=(activeWeek&&activeWeek.updatedAt)||null;
+      if(!force && localChanged && remoteChanged && new Date(remoteChanged)<=new Date(localChanged)) return;
       syncing=true;
       shopping=[];
       pendingShopping=null;
       applyState(data.week.payload);
-      activeWeek=Object.assign({},data.week.payload.w||activeWeek,{id:data.week.id||weekId,updatedAt:data.week.updatedAt||new Date().toISOString(),savedAt:data.week.updatedAt||null,lastEditor:data.week.lastEditor||'app'});
+      activeWeek=Object.assign({},activeWeek||{},remoteMeta,{id:data.week.id||weekId,updatedAt:remoteChanged,savedAt:remoteMeta.savedAt||data.week.updatedAt||null,lastEditor:data.week.lastEditor||remoteMeta.lastEditor||'app'});
       if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
       localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));
       if(pendingShopping){
@@ -221,7 +232,7 @@
   if(typeof shareWeek==='function'){
     shareWeek=async function(){
       saveSession();
-      saveRemoteNow();
+      saveRemoteNow(true);
       let longLink=location.origin+location.pathname+'?week='+encodeURIComponent(activeWeek.id||CURRENT_ID);
       let link=longLink;
       try{
@@ -246,13 +257,14 @@
     activeWeek.updatedAt=new Date().toISOString();
     activeWeek.savedAt=null;
     activeWeek.lastEditor=null;
+    dirty=true;
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
     plan=[]; excluded={}; shopping=[]; pendingShopping=null;
     generatePlan();
     buildShopping({keepManual:false});
     saveSession();
     renderAll();
-    saveRemoteNow();
+    saveRemoteNow(true);
   };
 
   try{restoreLocalState();buildShopping();renderAll();}catch(e){}
@@ -267,8 +279,8 @@
     loadRemote(CURRENT_ID,true);
   }
 
-  window.addEventListener('pagehide',saveRemoteNow);
-  window.addEventListener('beforeunload',saveRemoteNow);
+  window.addEventListener('pagehide',()=>saveRemoteNow(false));
+  window.addEventListener('beforeunload',()=>saveRemoteNow(false));
   window.addEventListener('focus',()=>loadRemote(activeWeek.id||CURRENT_ID,false));
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRemoteNow();else loadRemote(activeWeek.id||CURRENT_ID,false);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRemoteNow(false);else loadRemote(activeWeek.id||CURRENT_ID,false);});
 })();
