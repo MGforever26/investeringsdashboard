@@ -45,7 +45,7 @@ function sourceLabel(s){s=s==='ekstra'?'manuelt':s;return s==='ret'?'Ret':s==='s
 `;
     html=html.replace('const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};','const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};'+helper);
     html=html.replace('function saveSession(){sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}','function saveSession(touch=true){if(touch!==false)touchWeek();else store.set(\'madplan_week_meta_v1\',activeWeek);sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}');
-    html=html.replace('</body>','<scr'+'ipt src="shared-sync.js?v=10"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=6"></scr'+'ipt></body>');
+    html=html.replace('</body>','<scr'+'ipt src="shared-sync.js?v=11"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=6"></scr'+'ipt></body>');
     document.open();document.write(html);document.close();
   }catch(e){document.body.innerHTML='<div class="card"><h1>Madplan kunne ikke åbnes</h1><p>Prøv at genindlæse siden.</p><p class="muted">Fejl: '+String(e.message||e)+'</p></div>'}
 })();
