@@ -40,9 +40,19 @@
     const oldStartNewWeek=startNewWeek;
     startNewWeek=function(){
       const before=(activeWeek&&activeWeek.changedAt)||null;
+      const previousDays=days;
+      const previousMeatDays=meatDays;
+
+      days=5;
+      if(meatDays>days) meatDays=days;
       oldStartNewWeek();
+
       const after=(activeWeek&&activeWeek.changedAt)||null;
-      if(!after || after===before) return;
+      if(!after || after===before){
+        days=previousDays;
+        meatDays=previousMeatDays;
+        return;
+      }
 
       try{localStorage.setItem(RESET_KEY,String(Date.now()));}catch(e){}
       clearNonfood();
