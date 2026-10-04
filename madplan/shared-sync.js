@@ -210,6 +210,7 @@
       if(!data || !data.ok || !data.found || !data.week || !data.week.payload){
         return;
       }
+      try{window.madplanLastRemotePayload=data.week.payload;}catch(e){}
       let remoteMeta=data.week.payload.w||{};
       let remoteChanged=remoteMeta.changedAt||remoteMeta.updatedAt||data.week.version||data.week.updatedAt||null;
       let localChanged=(activeWeek&&activeWeek.changedAt)||null;
