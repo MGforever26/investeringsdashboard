@@ -112,6 +112,7 @@
   }
 
   ensureWeekMeta();
+  try{if(window.madplanLastRemotePayload&&Array.isArray(window.madplanLastRemotePayload.h))mergeHistory(window.madplanLastRemotePayload.h);}catch(e){}
 
   if(typeof newWeekMeta==='function'){
     const oldNewWeekMeta=newWeekMeta;
