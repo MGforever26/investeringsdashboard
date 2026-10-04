@@ -32,7 +32,7 @@
 
   function normalizeShoppingCategories(){
     if(!Array.isArray(shopping)) return;
-    shopping.forEach(i=>{i.category=betterCategory(i.name,i.category);});
+    shopping.forEach(i=>{let source=i.source==='ekstra'?'manuelt':i.source;if(source!=='manuelt')i.category=betterCategory(i.name,i.category);});
   }
 
   if(typeof buildShopping==='function'){
@@ -46,7 +46,7 @@
   if(typeof addItem==='function'){
     const previousAddItem=addItem;
     addItem=function(cat,name){
-      return previousAddItem(betterCategory(name,cat),name);
+      return previousAddItem(canonicalCat(cat),name);
     };
   }
 
