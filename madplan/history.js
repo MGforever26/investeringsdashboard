@@ -29,7 +29,7 @@
   }
 
   function historyKey(x){
-    return String(x.startedAt||'')+'|'+String(x.endedAt||'').slice(0,10)+'|'+x.recipes.map(norm).join('>');
+    return String(x.startedAt||'');
   }
 
   function mergeHistory(incoming){
@@ -86,7 +86,7 @@
       const endedAt=new Date().toISOString();
       const meta=activeWeek||{};
       const confidence=archiveConfidence(meta,names,endedAt);
-      if(confidence<4) return false;
+      if(confidence<4.5) return false;
       if(mealHistory.some(x=>x.startedAt===meta.createdAt)) return false;
       mealHistory.push({
         startedAt:meta.createdAt,
