@@ -54,10 +54,15 @@
     return source==='manuelt' ? (cat||'andet') : fixCategory(name,cat);
   }
 
+  function sourceGroup(source){
+    source=source==='ekstra'?'manuelt':(source||'ret');
+    return source==='manuelt'?'manuelt':'genereret';
+  }
+
   function shoppingKey(name,cat,source){
     source=source==='ekstra'?'manuelt':(source||'ret');
     cat=resolvedCategory(name,cat,source);
-    return source+'|'+cat+'|'+cleanName(name).toLowerCase();
+    return sourceGroup(source)+'|'+cat+'|'+cleanName(name).toLowerCase();
   }
 
   function shoppingSnapshot(){
@@ -73,9 +78,16 @@
       arr.forEach(x=>{
         let name=x[0],cat=typeof x[1]==='number'?(CATS[x[1]]||'andet'):(x[1]||'andet'),source=x[2]==='ekstra'?'manuelt':(x[2]||'ret');
         cat=resolvedCategory(name,cat,source);
-        map[shoppingKey(name,cat,source)]={qty:Number(x[3])||1,on:x[4]!==false};
+        let key=shoppingKey(name,cat,source),qty=Number(x[3])||1,on=x[4]!==false;
+        if(!map[key])map[key]={total:0,active:0,anyOn:false};
+        map[key].total+=qty;
+        if(on){map[key].active+=qty;map[key].anyOn=true;}
       });
-      shopping.forEach(i=>{i.category=resolvedCategory(i.name,i.category,i.source);let v=map[shoppingKey(i.name,i.category,i.source)];if(v){i.qty=v.qty;i.on=v.on;}});
+      shopping.forEach(i=>{
+        i.category=resolvedCategory(i.name,i.category,i.source);
+        let v=map[shoppingKey(i.name,i.category,i.source)];
+        if(v){i.qty=v.anyOn?v.active:v.total;i.on=v.anyOn;}
+      });
     }catch(e){}
   }
 
@@ -176,12 +188,13 @@
         name=cleanName(name);cat=fixCategory(name,cat||'andet');
         let key=shoppingKey(name,cat,source);
         if(!m[key])m[key]={id:id(),name,category:cat,qty:0,on:true,source};
+        else if(sourceGroup(source)==='genereret' && sourceGroup(m[key].source)==='genereret' && m[key].source!==source)m[key].source='ret+standard';
         m[key].qty+=qty;
       }
       plan.map(byId).forEach((r,di)=>(r.ingredients||[]).forEach(i=>{if(ingOn(di,i))add(i.name,i.category,1,'ret')}));
       STANDARD.forEach(i=>add(i.name,i.category,i.qty,'standard'));
       manual.forEach(i=>{let key=shoppingKey(i.name,i.category,'manuelt');if(!m[key])m[key]=i;else m[key].qty+=i.qty});
-      shopping=Object.values(m).sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||a.source.localeCompare(b.source,'da')||a.name.localeCompare(b.name,'da'));
+      shopping=Object.values(m).sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||a.name.localeCompare(b.name,'da'));
       applyShoppingSnapshot({sx:prior});
     };
   }
