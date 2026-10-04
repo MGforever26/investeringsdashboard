@@ -317,7 +317,7 @@
       box.style.padding='13px 16px';
       box.style.marginBottom='14px';
       const note=state.cold
-        ?'Forslagene bliver skarpere, efterhånden som vi bygger historik op. De samme retter ligger øverst i retvælgerne nedenfor.'
+        ?'Her fremhæves retter, vi ofte vælger, men ikke har fået for nylig. Forslagene bliver skarpere, efterhånden som vi bygger historik op. De samme retter ligger øverst i retvælgerne nedenfor.'
         :'Baseret på hvad vi plejer at vælge, og hvor længe siden retterne sidst var på planen. De samme forslag ligger øverst i retvælgerne nedenfor.';
       box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">Oplagte denne uge</div>'
         +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill" style="cursor:default;opacity:.88">'+esc(cap(n))+'</span>').join('')+'</div>'
