@@ -84,7 +84,7 @@
     stateObj=function(){
       let o=oldStateObj();
       try{o.sx=shoppingSnapshot();}catch(e){}
-      try{o.w={id:(activeWeek&&activeWeek.id)||CURRENT_ID,label:(activeWeek&&activeWeek.label)||currentLabel(),changedAt:(activeWeek&&activeWeek.changedAt)||null,updatedAt:(activeWeek&&activeWeek.changedAt)||null,savedAt:(activeWeek&&activeWeek.savedAt)||null,lastEditor:(activeWeek&&activeWeek.lastEditor)||null};}catch(e){}
+      try{o.w={id:(activeWeek&&activeWeek.id)||CURRENT_ID,label:(activeWeek&&activeWeek.label)||currentLabel(),createdAt:(activeWeek&&activeWeek.createdAt)||null,changedAt:(activeWeek&&activeWeek.changedAt)||null,updatedAt:(activeWeek&&activeWeek.changedAt)||null,savedAt:(activeWeek&&activeWeek.savedAt)||null,lastEditor:(activeWeek&&activeWeek.lastEditor)||null};}catch(e){}
       return o;
     };
   }
