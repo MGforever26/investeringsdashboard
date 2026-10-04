@@ -286,10 +286,10 @@
       box.style.marginBottom='14px';
       const title=state.preview?'Oplagte denne uge · forhåndsvisning':'Oplagte denne uge';
       const note=state.preview
-        ?'<div class="sub" style="margin-top:5px">Eksempel på placeringen. Rigtige forslag tager automatisk over, når historikken er klar.</div>'
-        :'';
+        ?'<div class="sub" style="margin-top:5px">Her fremhæves retter, I ofte vælger, men ikke har fået for nylig. De samme forslag ligger øverst i retvælgerne nedenfor.</div>'
+        :'<div class="sub" style="margin-top:5px">Baseret på jeres tidligere valg og hvor længe siden retterne sidst var på planen. De samme forslag ligger øverst i retvælgerne nedenfor.</div>';
       box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">'+esc(title)+'</div>'
-        +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill">'+esc(cap(n))+'</span>').join('')+'</div>'+note;
+        +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill" style="cursor:default;opacity:.88">'+esc(cap(n))+'</span>').join('')+'</div>'+note;
       host.parentNode.insertBefore(box,host);
     }catch(e){}
   }
