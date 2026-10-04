@@ -34,6 +34,10 @@
         "category": "konserves og tørvarer"
       },
       {
+        "name": "hakkede tomater",
+        "category": "konserves og tørvarer"
+      },
+      {
         "name": "tomatpure",
         "category": "konserves og tørvarer"
       },
@@ -104,7 +108,11 @@
         "category": "frostvarer"
       },
       {
-        "name": "nudler",
+        "name": "risnudler",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "risnudler",
         "category": "konserves og tørvarer"
       },
       {
@@ -496,6 +504,10 @@
       {
         "name": "gulerødder",
         "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hakkede tomater",
+        "category": "konserves og tørvarer"
       },
       {
         "name": "hakkede tomater",
@@ -1494,6 +1506,10 @@
       {
         "name": "gulerødder",
         "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hakkede tomater",
+        "category": "konserves og tørvarer"
       },
       {
         "name": "hakkede tomater",
