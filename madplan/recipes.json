@@ -176,7 +176,7 @@
         "category": "mælkeprodukter og pålæg"
       },
       {
-        "name": "parmesanost",
+        "name": "revet quattro formaggi",
         "category": "mælkeprodukter og pålæg"
       },
       {
@@ -312,7 +312,7 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "revet ost",
+        "name": "revet mozzarella/gouda",
         "category": "mælkeprodukter og pålæg"
       },
       {
@@ -598,7 +598,7 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "parmesanost",
+        "name": "revet quattro formaggi",
         "category": "mælkeprodukter og pålæg"
       }
     ]
@@ -1006,7 +1006,7 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "revet ost",
+        "name": "revet mozzarella/gouda",
         "category": "mælkeprodukter og pålæg"
       }
     ]
@@ -1272,6 +1272,10 @@
       {
         "name": "broccoli",
         "category": "grøntsager og frugt"
+      },
+      {
+        "name": "parmesanost",
+        "category": "mælkeprodukter og pålæg"
       }
     ]
   },
@@ -1632,7 +1636,7 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "parmesanost",
+        "name": "revet quattro formaggi",
         "category": "mælkeprodukter og pålæg"
       }
     ]
