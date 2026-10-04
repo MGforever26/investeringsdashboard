@@ -658,10 +658,6 @@
         "category": "mælkeprodukter og pålæg"
       },
       {
-        "name": "krydderier",
-        "category": "andet"
-      },
-      {
         "name": "hvidløg",
         "category": "grøntsager og frugt"
       },
@@ -1206,7 +1202,7 @@
         "category": "mælkeprodukter og pålæg"
       },
       {
-        "name": "bitter salat",
+        "name": "ruccola",
         "category": "grøntsager og frugt"
       }
     ]
