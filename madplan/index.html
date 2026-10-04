@@ -45,7 +45,7 @@ function ensureDeviceName(){try{if(deviceName()||localStorage.getItem('madplan_e
 setTimeout(ensureDeviceName,1200);
 function formatDateTime(x){try{return x?new Date(x).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'ikke ændret endnu'}catch{return 'ukendt'}}
 function weekTop(){let changed=activeWeek.changedAt||activeWeek.updatedAt||null;let editor=(activeWeek.lastEditor&&activeWeek.lastEditor!=='app')?' af '+esc(activeWeek.lastEditor):'';return '<div class="card no-print"><h2>'+esc(activeWeek.label||'Uge')+'</h2><p class="sub">Senest ændret '+formatDateTime(changed)+editor+'</p><div class="row" style="margin-top:12px"><button class="btn secondary" onclick="startNewWeek()">Start ny uge</button></div></div>'}
-function sourceLabel(s){s=s==='ekstra'?'manuelt':s;return s==='ret'?'Ret':s==='standard'?'Standard':s==='ret+standard'?'Ret + standard':s==='manuelt'?'Manuelt':cap(s||'Manuelt')}
+function sourceLabel(s){s=s==='ekstra'?'manuelt':s;return s==='ret'?'Ret':s==='standard'?'Standard':s==='manuelt'?'Manuelt':cap(s||'Manuelt')}
 `;
     html=html.replace('const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};','const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};'+helper);
     html=html.replace('function saveSession(){sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}','function saveSession(touch=true){if(touch!==false)touchWeek();else store.set(\'madplan_week_meta_v1\',activeWeek);sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}');
