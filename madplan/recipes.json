@@ -1154,6 +1154,10 @@
         "category": "andet"
       },
       {
+        "name": "frisk pasta",
+        "category": "andet"
+      },
+      {
         "name": "hasselnødder",
         "category": "konserves og tørvarer"
       },
@@ -1191,6 +1195,10 @@
     "name": "tortellinisuppe",
     "type": "vegetar",
     "ingredients": [
+      {
+        "name": "tortellini",
+        "category": "andet"
+      },
       {
         "name": "tortellini",
         "category": "andet"
@@ -1295,6 +1303,10 @@
     "name": "pasta med pesto",
     "type": "vegetar",
     "ingredients": [
+      {
+        "name": "tortellini",
+        "category": "andet"
+      },
       {
         "name": "tortellini",
         "category": "andet"
