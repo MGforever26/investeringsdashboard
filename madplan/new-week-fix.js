@@ -55,8 +55,12 @@
       }
 
       try{localStorage.setItem(RESET_KEY,String(Date.now()));}catch(e){}
-      clearNonfood();
-      try{buildShopping({keepManual:false});}catch(e){}
+      try{
+        shopping=[];
+        pendingShopping=null;
+        excluded={};
+        buildShopping({keepManual:false});
+      }catch(e){}
       clearNonfood();
       try{saveSession();renderAll();}catch(e){}
     };
