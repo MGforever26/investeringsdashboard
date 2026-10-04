@@ -42,7 +42,7 @@
         "category": "mælkeprodukter og pålæg"
       },
       {
-        "name": "broccolli",
+        "name": "broccoli",
         "category": "grøntsager og frugt"
       }
     ]
@@ -240,7 +240,7 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "mozarella",
+        "name": "mozzarella",
         "category": "mælkeprodukter og pålæg"
       }
     ]
@@ -794,7 +794,7 @@
         "category": "mælkeprodukter og pålæg"
       },
       {
-        "name": "broccolli",
+        "name": "broccoli",
         "category": "grøntsager og frugt"
       },
       {
@@ -1016,7 +1016,7 @@
         "category": "mælkeprodukter og pålæg"
       },
       {
-        "name": "lauerbærblade",
+        "name": "laurbærblade",
         "category": "andet"
       }
     ]
@@ -1128,13 +1128,13 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "salsichia",
+        "name": "salsiccia",
         "category": "mælkeprodukter og pålæg"
       }
     ]
   },
   {
-    "name": "frisk pasta med svame- og nøddesauce",
+    "name": "frisk pasta med svampe- og nøddesauce",
     "type": "vegetar",
     "ingredients": [
       {
@@ -1230,7 +1230,7 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "broccolli",
+        "name": "broccoli",
         "category": "grøntsager og frugt"
       }
     ]
@@ -1354,11 +1354,11 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "ærter",
+        "name": "frosne ærter",
         "category": "frostvarer"
       },
       {
-        "name": "majs",
+        "name": "frostmajs",
         "category": "frostvarer"
       },
       {
@@ -1538,7 +1538,7 @@
         "category": "konserves og tørvarer"
       },
       {
-        "name": "broccolli",
+        "name": "broccoli",
         "category": "grøntsager og frugt"
       },
       {
