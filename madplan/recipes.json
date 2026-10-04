@@ -26,6 +26,10 @@
         "category": "konserves og tørvarer"
       },
       {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
+      },
+      {
         "name": "hakket oksekød",
         "category": "andet"
       },
@@ -159,6 +163,10 @@
     "name": "pasta carbonara",
     "type": "kød",
     "ingredients": [
+      {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
+      },
       {
         "name": "pasta",
         "category": "konserves og tørvarer"
@@ -433,6 +441,10 @@
     "name": "pasta med bacon og broccoli",
     "type": "kød",
     "ingredients": [
+      {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
+      },
       {
         "name": "pasta",
         "category": "konserves og tørvarer"
@@ -798,6 +810,10 @@
         "category": "konserves og tørvarer"
       },
       {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
+      },
+      {
         "name": "kylling",
         "category": "andet"
       },
@@ -1109,6 +1125,10 @@
     "name": "pasta og grønkål",
     "type": "vegetar",
     "ingredients": [
+      {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
+      },
       {
         "name": "pasta",
         "category": "konserves og tørvarer"
@@ -1534,6 +1554,10 @@
       {
         "name": "løg",
         "category": "grøntsager og frugt"
+      },
+      {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
       },
       {
         "name": "pasta",
