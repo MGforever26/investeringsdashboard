@@ -214,54 +214,85 @@
 
   function realSuggestionIds(limit=5){
     if(mealHistory.length<2||!Array.isArray(recipes)) return [];
+    const inPlan=new Set(Array.isArray(plan)?plan:[]);
     return recipes.map(r=>{
       const s=historyStats(r.name);
       return {r,s,score:recipeWeight(r)};
-    }).filter(x=>x.s.usedWeeks>0&&x.s.lastIndex>0)
+    }).filter(x=>x.s.usedWeeks>0&&x.s.lastIndex>0&&!inPlan.has(x.r.id))
       .sort((a,b)=>b.score-a.score||b.s.lastIndex-a.s.lastIndex||a.r.name.localeCompare(b.r.name,'da'))
       .slice(0,limit).map(x=>x.r.id);
   }
 
   function previewSuggestionIds(limit=5){
-    const preferred=['dahl','rød karry','fiskefrikadeller','Pasta bolognese','bygotto'];
+    const inPlan=new Set(Array.isArray(plan)?plan:[]);
+    const preferred=['dahl','rød karry','fiskefrikadeller','Pasta bolognese','bygotto','tacos','butter chicken','pasta carbonara'];
     const ids=[];
     preferred.forEach(name=>{
       const r=(recipes||[]).find(x=>norm(x.name)===norm(name));
-      if(r&&!ids.includes(r.id))ids.push(r.id);
+      if(r&&!inPlan.has(r.id)&&!ids.includes(r.id))ids.push(r.id);
     });
-    (recipes||[]).forEach(r=>{if(ids.length<limit&&!ids.includes(r.id))ids.push(r.id);});
+    (recipes||[]).forEach(r=>{
+      if(ids.length<limit&&!inPlan.has(r.id)&&!ids.includes(r.id))ids.push(r.id);
+    });
     return ids.slice(0,limit);
   }
 
   function suggestionState(){
     const real=realSuggestionIds();
-    if(real.length)return {ids:real,preview:false};
-    if(mealHistory.length<2)return {ids:previewSuggestionIds(),preview:true};
-    return {ids:[],preview:false};
+    if(real.length)return {ids:real,cold:false};
+    return {ids:previewSuggestionIds(),cold:mealHistory.length<2};
   }
 
   function suggestionIds(limit=5){
     return suggestionState().ids.slice(0,limit);
   }
 
-  function decorateRecipeSelectors(){
+  function pickerRow(day,r,selected){
+    return '<button type="button" data-meal-day="'+day+'" data-meal-id="'+esc(r.id)+'" style="display:block;width:100%;text-align:left;padding:10px 11px;border:0;background:'+(selected?'var(--soft)':'transparent')+';border-radius:10px;font:inherit;color:inherit;cursor:pointer;font-weight:'+(selected?'700':'500')+'">'+esc(cap(r.name))+(selected?' <span class="sub" style="float:right">valgt</span>':'')+'</button>';
+  }
+
+  if(typeof dayCard==='function'){
+    dayCard=function(i,rid){
+      const r=byId(rid);
+      const state=suggestionState();
+      const suggested=state.ids.map(v=>(recipes||[]).find(x=>x.id===v)).filter(Boolean);
+      const suggestedSet=new Set(suggested.map(x=>x.id));
+      const rest=(recipes||[]).filter(x=>!suggestedSet.has(x.id));
+      const picker='<details data-meal-picker="'+i+'" style="margin:10px 0">'
+        +'<summary style="cursor:pointer;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;font-weight:600">'+esc(cap(r.name))+'</summary>'
+        +'<div data-meal-menu="'+i+'" style="margin-top:6px;border:1px solid var(--line);border-radius:14px;padding:8px;background:#fff;max-height:360px;overflow:auto">'
+        +(suggested.length?'<div class="sub" style="font-weight:700;padding:5px 8px 6px">Oplagte denne uge</div>'+suggested.map(x=>pickerRow(i,x,x.id===rid)).join(''):'')
+        +'<div class="sub" style="font-weight:700;padding:10px 8px 6px">Alle øvrige retter</div>'
+        +rest.map(x=>pickerRow(i,x,x.id===rid)).join('')
+        +'</div></details>';
+      return '<div class="card day"><div class="bubble">'+(i+1)+'</div><div><div class="row" style="justify-content:space-between"><h3>Dag '+(i+1)+'</h3><span class="pill">'+esc(r.type)+'</span></div>'
+        +picker
+        +'<details><summary class="sub">Ingredienser ('+r.ingredients.filter(x=>ingOn(i,x)).length+'/'+r.ingredients.length+' valgt)</summary><div style="margin-top:8px">'
+        +r.ingredients.map((x,idx)=>'<div class="item" style="grid-template-columns:32px 1fr"><button class="check '+(ingOn(i,x)?'on':'')+'" onclick="toggleIng('+i+','+idx+')">'+(ingOn(i,x)?'✓':'')+'</button><div><b>'+esc(x.name)+'</b><div class="sub" style="margin:2px 0 0">'+esc(x.category)+'</div></div></div>').join('')
+        +'</div></details></div></div>';
+    };
+  }
+
+  function attachMealPickers(){
     try{
-      const state=suggestionState(),suggested=state.ids;
-      if(!suggested.length) return;
-      document.querySelectorAll('select[data-day]').forEach(sel=>{
-        const current=sel.value;
-        const options=[...sel.querySelectorAll('option')];
-        const byValue=new Map(options.map(o=>[o.value,o]));
-        const top=document.createElement('optgroup');
-        top.label=state.preview?'Oplagte denne uge · eksempel':'Oplagte denne uge';
-        suggested.forEach(v=>{const o=byValue.get(v);if(o){top.appendChild(o);byValue.delete(v);}});
-        const rest=document.createElement('optgroup');
-        rest.label='Alle retter';
-        options.forEach(o=>{if(byValue.has(o.value)){rest.appendChild(o);byValue.delete(o.value);}});
-        sel.innerHTML='';
-        if(top.children.length) sel.appendChild(top);
-        if(rest.children.length) sel.appendChild(rest);
-        sel.value=current;
+      document.querySelectorAll('details[data-meal-picker]').forEach(d=>{
+        d.addEventListener('toggle',()=>{
+          if(!d.open)return;
+          document.querySelectorAll('details[data-meal-picker]').forEach(other=>{if(other!==d)other.open=false;});
+          const menu=d.querySelector('[data-meal-menu]');
+          if(menu)menu.scrollTop=0;
+        });
+      });
+      document.querySelectorAll('[data-meal-day][data-meal-id]').forEach(b=>{
+        b.onclick=()=>{
+          const day=Number(b.dataset.mealDay),recipeId=b.dataset.mealId;
+          if(!Number.isInteger(day)||!recipeId)return;
+          plan[day]=recipeId;
+          excluded={};
+          buildShopping();
+          saveSession();
+          renderAll();
+        };
       });
     }catch(e){}
   }
@@ -284,12 +315,12 @@
       box.className='card no-print';
       box.style.padding='13px 16px';
       box.style.marginBottom='14px';
-      const title=state.preview?'Oplagte denne uge · forhåndsvisning':'Oplagte denne uge';
-      const note=state.preview
-        ?'<div class="sub" style="margin-top:5px">Her fremhæves retter, I ofte vælger, men ikke har fået for nylig. De samme forslag ligger øverst i retvælgerne nedenfor.</div>'
-        :'<div class="sub" style="margin-top:5px">Baseret på jeres tidligere valg og hvor længe siden retterne sidst var på planen. De samme forslag ligger øverst i retvælgerne nedenfor.</div>';
-      box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">'+esc(title)+'</div>'
-        +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill" style="cursor:default;opacity:.88">'+esc(cap(n))+'</span>').join('')+'</div>'+note;
+      const note=state.cold
+        ?'Forslagene bliver skarpere, efterhånden som vi bygger historik op. De samme retter ligger øverst i retvælgerne nedenfor.'
+        :'Baseret på hvad vi plejer at vælge, og hvor længe siden retterne sidst var på planen. De samme forslag ligger øverst i retvælgerne nedenfor.';
+      box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">Oplagte denne uge</div>'
+        +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill" style="cursor:default;opacity:.88">'+esc(cap(n))+'</span>').join('')+'</div>'
+        +'<div class="sub" style="margin-top:6px">'+esc(note)+'</div>';
       host.parentNode.insertBefore(box,host);
     }catch(e){}
   }
@@ -298,8 +329,8 @@
     const oldRenderPlan=renderPlan;
     renderPlan=function(){
       const out=oldRenderPlan();
-      decorateRecipeSelectors();
       renderSuggestionStrip();
+      attachMealPickers();
       return out;
     };
   }
