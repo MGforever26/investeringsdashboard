@@ -49,14 +49,19 @@
     return cat||'andet';
   }
 
+  function resolvedCategory(name,cat,source){
+    source=source==='ekstra'?'manuelt':(source||'ret');
+    return source==='manuelt' ? (cat||'andet') : fixCategory(name,cat);
+  }
+
   function shoppingKey(name,cat,source){
     source=source==='ekstra'?'manuelt':(source||'ret');
-    cat=fixCategory(name,cat);
+    cat=resolvedCategory(name,cat,source);
     return source+'|'+cat+'|'+cleanName(name).toLowerCase();
   }
 
   function shoppingSnapshot(){
-    try{return shopping.map(i=>[i.name,Math.max(0,CATS.indexOf(fixCategory(i.name,i.category)||'andet')),i.source==='ekstra'?'manuelt':(i.source||'ret'),Number(i.qty)||1,i.on!==false]);}
+    try{return shopping.map(i=>{let source=i.source==='ekstra'?'manuelt':(i.source||'ret');let cat=resolvedCategory(i.name,i.category,source);return [i.name,Math.max(0,CATS.indexOf(cat||'andet')),source,Number(i.qty)||1,i.on!==false];});}
     catch(e){return []}
   }
 
@@ -67,10 +72,10 @@
       let map={};
       arr.forEach(x=>{
         let name=x[0],cat=typeof x[1]==='number'?(CATS[x[1]]||'andet'):(x[1]||'andet'),source=x[2]==='ekstra'?'manuelt':(x[2]||'ret');
-        cat=fixCategory(name,cat);
+        cat=resolvedCategory(name,cat,source);
         map[shoppingKey(name,cat,source)]={qty:Number(x[3])||1,on:x[4]!==false};
       });
-      shopping.forEach(i=>{i.category=fixCategory(i.name,i.category);let v=map[shoppingKey(i.name,i.category,i.source)];if(v){i.qty=v.qty;i.on=v.on;}});
+      shopping.forEach(i=>{i.category=resolvedCategory(i.name,i.category,i.source);let v=map[shoppingKey(i.name,i.category,i.source)];if(v){i.qty=v.qty;i.on=v.on;}});
     }catch(e){}
   }
 
@@ -98,7 +103,7 @@
       applyState(data);
       if(data.w) activeWeek=Object.assign({},activeWeek||{},data.w,{changedAt:data.w.changedAt||data.w.updatedAt||null});
       if(pendingShopping){
-        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
+        shopping=pendingShopping.map(i=>{let source=i.source==='ekstra'?'manuelt':(i.source||'manuelt');return {id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:resolvedCategory(i.name,i.category,source),qty:Number(i.qty)||1,on:i.on!==false,source};});
         pendingShopping=null;
         buildShopping();
       }else buildShopping();
@@ -164,7 +169,7 @@
       let keepManual=opts.keepManual!==false;
       let prior=keepManual?shoppingSnapshot():[];
       let manual=keepManual?shopping.filter(i=>(i.source==='manuelt'||i.source==='ekstra')&&i.name).map(i=>({
-        id:i.id||id(),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:'manuelt'
+        id:i.id||id(),name:cleanName(i.name),category:i.category||'andet',qty:Number(i.qty)||1,on:i.on!==false,source:'manuelt'
       })) : [];
       let m={};
       function add(name,cat,qty=1,source='ret'){
@@ -183,14 +188,14 @@
 
   if(typeof itemRow==='function'){
     itemRow=function(i){
-      i.category=fixCategory(i.name,i.category);
+      i.category=resolvedCategory(i.name,i.category,i.source);
       return '<div class="item"><button class="check '+(i.on?'on':'')+'" data-toggle="'+i.id+'">'+(i.on?'✓':'')+'</button><div><b>'+esc(i.name)+'</b><div class="sub" style="margin:2px 0 0">'+esc(sourceLabel(i.source))+'</div></div><div class="qty"><button data-minus="'+i.id+'">−</button><span>'+i.qty+'</span><button data-plus="'+i.id+'">+</button></div></div>';
     };
   }
 
   if(typeof addItem==='function'){
     addItem=function(cat,name){
-      name=cleanName(name);cat=fixCategory(name,cat);
+      name=cleanName(name);cat=cat||'andet';
       let found=shopping.find(i=>i.category===cat&&i.name.toLowerCase()===name.toLowerCase()&&(i.source==='manuelt'||i.source==='ekstra'));
       if(found){found.qty++;found.on=true;found.source='manuelt'}
       else shopping.push({id:id(),name,category:cat,qty:1,on:true,source:'manuelt'});
@@ -217,7 +222,7 @@
       if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
       saveWeekMeta();
       if(pendingShopping){
-        shopping=pendingShopping.map(i=>({id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:fixCategory(i.name,i.category),qty:Number(i.qty)||1,on:i.on!==false,source:i.source==='ekstra'?'manuelt':(i.source||'manuelt')}));
+        shopping=pendingShopping.map(i=>{let source=i.source==='ekstra'?'manuelt':(i.source||'manuelt');return {id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:resolvedCategory(i.name,i.category,source),qty:Number(i.qty)||1,on:i.on!==false,source};});
         pendingShopping=null;
         buildShopping();
       }else{
