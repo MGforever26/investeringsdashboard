@@ -8,7 +8,6 @@
   function expectedQuantities(){
     const recipe=new Map();
     const standard=new Map();
-    const generated=new Map();
 
     try{
       plan.map(byId).forEach((r,day)=>{
@@ -16,20 +15,18 @@
           if(!ingOn(day,i)) return;
           const k=normName(i.name);
           recipe.set(k,(recipe.get(k)||0)+1);
-          generated.set(k,(generated.get(k)||0)+1);
         });
       });
     }catch(e){}
 
     try{
       STANDARD.forEach(i=>{
-        const k=normName(i.name),qty=Number(i.qty)||1;
-        standard.set(k,(standard.get(k)||0)+qty);
-        generated.set(k,(generated.get(k)||0)+qty);
+        const k=normName(i.name);
+        standard.set(k,(standard.get(k)||0)+(Number(i.qty)||1));
       });
     }catch(e){}
 
-    return {recipe,standard,generated};
+    return {recipe,standard};
   }
 
   function correctGeneratedQuantities(){
@@ -43,7 +40,6 @@
       let qty=null;
       if(source==='ret' && expected.recipe.has(k)) qty=expected.recipe.get(k);
       if(source==='standard' && expected.standard.has(k)) qty=expected.standard.get(k);
-      if(source==='ret+standard' && expected.generated.has(k)) qty=expected.generated.get(k);
       if(qty!==null && Number(i.qty)!==qty){
         i.qty=qty;
         changed=true;
