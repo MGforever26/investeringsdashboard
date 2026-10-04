@@ -212,7 +212,7 @@
     };
   }
 
-  function suggestionIds(limit=5){
+  function realSuggestionIds(limit=5){
     if(mealHistory.length<2||!Array.isArray(recipes)) return [];
     return recipes.map(r=>{
       const s=historyStats(r.name);
@@ -222,16 +222,38 @@
       .slice(0,limit).map(x=>x.r.id);
   }
 
+  function previewSuggestionIds(limit=5){
+    const preferred=['dahl','rød karry','fiskefrikadeller','Pasta bolognese','bygotto'];
+    const ids=[];
+    preferred.forEach(name=>{
+      const r=(recipes||[]).find(x=>norm(x.name)===norm(name));
+      if(r&&!ids.includes(r.id))ids.push(r.id);
+    });
+    (recipes||[]).forEach(r=>{if(ids.length<limit&&!ids.includes(r.id))ids.push(r.id);});
+    return ids.slice(0,limit);
+  }
+
+  function suggestionState(){
+    const real=realSuggestionIds();
+    if(real.length)return {ids:real,preview:false};
+    if(mealHistory.length<2)return {ids:previewSuggestionIds(),preview:true};
+    return {ids:[],preview:false};
+  }
+
+  function suggestionIds(limit=5){
+    return suggestionState().ids.slice(0,limit);
+  }
+
   function decorateRecipeSelectors(){
     try{
-      const suggested=suggestionIds();
+      const state=suggestionState(),suggested=state.ids;
       if(!suggested.length) return;
       document.querySelectorAll('select[data-day]').forEach(sel=>{
         const current=sel.value;
         const options=[...sel.querySelectorAll('option')];
         const byValue=new Map(options.map(o=>[o.value,o]));
         const top=document.createElement('optgroup');
-        top.label='Oplagte denne uge';
+        top.label=state.preview?'Oplagte denne uge · eksempel':'Oplagte denne uge';
         suggested.forEach(v=>{const o=byValue.get(v);if(o){top.appendChild(o);byValue.delete(v);}});
         const rest=document.createElement('optgroup');
         rest.label='Alle retter';
@@ -244,11 +266,40 @@
     }catch(e){}
   }
 
+  function renderSuggestionStrip(){
+    try{
+      const host=document.querySelector('#plan .grid.days');
+      if(!host||!host.parentNode)return;
+      const old=document.getElementById('meal-history-suggestions');
+      if(old)old.remove();
+      const state=suggestionState();
+      if(!state.ids.length)return;
+      const names=state.ids.map(v=>{
+        const r=(recipes||[]).find(x=>x.id===v);
+        return r?r.name:'';
+      }).filter(Boolean);
+      if(!names.length)return;
+      const box=document.createElement('div');
+      box.id='meal-history-suggestions';
+      box.className='card no-print';
+      box.style.padding='13px 16px';
+      box.style.marginBottom='14px';
+      const title=state.preview?'Oplagte denne uge · forhåndsvisning':'Oplagte denne uge';
+      const note=state.preview
+        ?'<div class="sub" style="margin-top:5px">Eksempel på placeringen. Rigtige forslag tager automatisk over, når historikken er klar.</div>'
+        :'';
+      box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">'+esc(title)+'</div>'
+        +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill">'+esc(cap(n))+'</span>').join('')+'</div>'+note;
+      host.parentNode.insertBefore(box,host);
+    }catch(e){}
+  }
+
   if(typeof renderPlan==='function'){
     const oldRenderPlan=renderPlan;
     renderPlan=function(){
       const out=oldRenderPlan();
       decorateRecipeSelectors();
+      renderSuggestionStrip();
       return out;
     };
   }
