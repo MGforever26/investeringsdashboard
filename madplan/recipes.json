@@ -1554,5 +1554,35 @@
         "category": "konserves og tørvarer"
       }
     ]
+  },
+  {
+    "name": "bygotto",
+    "type": "vegetar",
+    "ingredients": [
+      {
+        "name": "perlebyg",
+        "category": "mel og gryn"
+      },
+      {
+        "name": "tomatpure",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "passata",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "løg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hvidløg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "parmesanost",
+        "category": "mælkeprodukter og pålæg"
+      }
+    ]
   }
 ]
