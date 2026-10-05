@@ -176,10 +176,79 @@
     }catch(e){}
   }
 
+  function applyStandardRules(){
+    try{
+      const removed=learning.rules.filter(r=>r.type==='standard_remove');
+      if(removed.length){
+        shopping=shopping.filter(i=>!(
+          i.source==='standard' &&
+          removed.some(r=>norm(r.item)===norm(i.name))
+        ));
+      }
+
+      learning.rules.filter(r=>r.type==='standard_add').forEach(rule=>{
+        const cat=rule.category||'andet',name=cleanName(rule.item);
+        if(!name)return;
+        const exists=shopping.some(i=>i.source==='standard'&&norm(i.name)===norm(name));
+        if(!exists)shopping.push({
+          id:id(),name,category:cat,qty:Math.max(1,Number(rule.qty)||1),on:true,source:'standard'
+        });
+      });
+
+      shopping.sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||String(a.source||'').localeCompare(String(b.source||''),'da')||a.name.localeCompare(b.name,'da'));
+    }catch(e){}
+  }
+
+  function ingredientRuleFor(day,item){
+    try{
+      const r=byId(plan[day]);
+      if(!r)return null;
+      return learning.rules.find(rule=>
+        rule.type==='ingredient_off' &&
+        norm(rule.recipe)===norm(r.name) &&
+        norm(rule.item)===norm(item&&item.name)
+      )||null;
+    }catch(e){return null;}
+  }
+
+  if(typeof ingOn==='function'){
+    const oldIngOn=ingOn;
+    ingOn=function(day,item){
+      try{
+        const k=ingredientKey(day,item);
+        if(Object.prototype.hasOwnProperty.call(excluded,k))return !excluded[k];
+        if(ingredientRuleFor(day,item))return false;
+      }catch(e){}
+      return oldIngOn(day,item);
+    };
+  }
+
+  if(typeof toggleIng==='function'){
+    const oldToggleIng=toggleIng;
+    toggleIng=function(day,idx){
+      try{
+        const r=byId(plan[day]),item=(r&&r.ingredients||[])[idx];
+        if(item&&ingredientRuleFor(day,item)){
+          const before=ingOn(day,item);
+          const k=ingredientKey(day,item);
+          if(before) delete excluded[k];
+          else excluded[k]=false;
+          record('ingredient_toggle',{
+            recipe:r.name,recipeId:r.id,item:item.name,category:item.category,
+            before:!!before,after:!before
+          });
+          buildShopping();saveSession();renderAll();
+          return;
+        }
+      }catch(e){}
+      return oldToggleIng(day,idx);
+    };
+  }
+
   function applyRulesNow(){
     if(applying)return;
     applying=true;
-    try{applyOptionalRules();applyQuantityRules();}catch(e){}
+    try{applyOptionalRules();applyQuantityRules();applyStandardRules();}catch(e){}
     applying=false;
   }
 
@@ -190,6 +259,7 @@
     buildShopping=function(opts={}){
       const out=oldBuildShopping(opts);
       applyQuantityRules();
+      applyStandardRules();
       return out;
     };
   }
@@ -322,6 +392,12 @@
     return new Set(events.map(e=>e.week)).size;
   }
 
+  function finalPerWeek(events){
+    const map=new Map();
+    [...events].sort((a,b)=>String(a.ts).localeCompare(String(b.ts))).forEach(e=>map.set(e.week,e));
+    return [...map.values()];
+  }
+
   function quantityPatterns(){
     const groups=new Map();
     learning.events.filter(e=>e.type==='shopping_qty'&&e.source==='ret'&&e.recipe&&Number(e.after)>0).forEach(e=>{
@@ -330,10 +406,8 @@
       groups.get(k).push(e);
     });
     const out=[];
-    groups.forEach((events,k)=>{
-      const perWeek=new Map();
-      events.sort((a,b)=>String(a.ts).localeCompare(String(b.ts))).forEach(e=>perWeek.set(e.week,e));
-      const final=[...perWeek.values()];
+    groups.forEach(events=>{
+      const final=finalPerWeek(events);
       const byTarget=new Map();
       final.forEach(e=>{
         const target=Number(e.after);
@@ -383,8 +457,91 @@
     return out;
   }
 
+  function ingredientOffPatterns(){
+    const groups=new Map();
+    learning.events.filter(e=>e.type==='ingredient_toggle'&&e.recipe&&e.item).forEach(e=>{
+      const k=norm(e.recipe)+'|'+norm(e.item);
+      if(!groups.has(k))groups.set(k,[]);
+      groups.get(k).push(e);
+    });
+    const out=[];
+    groups.forEach(events=>{
+      const final=finalPerWeek(events).filter(e=>e.after===false);
+      const evidence=distinctWeeks(final);
+      if(evidence<3)return;
+      const sample=final[final.length-1];
+      const key='ingredient-off|'+norm(sample.recipe)+'|'+norm(sample.item);
+      if(ruleByKey(key))return;
+      out.push({
+        key,type:'ingredient_off',evidence,
+        recipe:sample.recipe,item:sample.item,category:sample.category,
+        title:'Madplan har opdaget et mønster',
+        text:'Vi har fravalgt '+sample.item+' i '+evidence+' forskellige uger, når '+sample.recipe+' har været på planen.',
+        question:'Fravælg '+sample.item+' som standard i '+sample.recipe+'?'
+      });
+    });
+    return out;
+  }
+
+  function standardOffPatterns(){
+    const groups=new Map();
+    learning.events.filter(e=>e.type==='shopping_toggle'&&e.source==='standard'&&e.item).forEach(e=>{
+      const k=norm(e.item);
+      if(!groups.has(k))groups.set(k,[]);
+      groups.get(k).push(e);
+    });
+    const out=[];
+    groups.forEach(events=>{
+      const final=finalPerWeek(events).filter(e=>e.after===false);
+      const evidence=distinctWeeks(final);
+      if(evidence<4)return;
+      const sample=final[final.length-1];
+      const key='standard-remove|'+norm(sample.item);
+      if(ruleByKey(key))return;
+      out.push({
+        key,type:'standard_remove',evidence,
+        item:sample.item,category:sample.category,
+        title:'Madplan har opdaget et mønster',
+        text:'Vi har slået '+sample.item+' fra som standardvare i '+evidence+' forskellige uger.',
+        question:'Fjern '+sample.item+' fra standardvarerne fremover?'
+      });
+    });
+    return out;
+  }
+
+  function optionalToStandardPatterns(){
+    const groups=new Map();
+    learning.events.filter(e=>e.type==='optional_add'&&e.item).forEach(e=>{
+      const k=norm(e.category)+'|'+norm(e.item);
+      if(!groups.has(k))groups.set(k,[]);
+      groups.get(k).push(e);
+    });
+    const out=[];
+    groups.forEach(events=>{
+      const evidence=distinctWeeks(events);
+      if(evidence<5)return;
+      const sample=events[events.length-1];
+      const key='standard-add|'+norm(sample.category)+'|'+norm(sample.item);
+      if(ruleByKey(key))return;
+      out.push({
+        key,type:'standard_add',evidence,
+        item:sample.item,category:sample.category,qty:1,
+        title:'Madplan har opdaget et mønster',
+        text:'Vi har valgt '+sample.item+' som tilvalg i '+evidence+' forskellige uger.',
+        question:'Gør '+sample.item+' til standardvare fremover?'
+      });
+    });
+    return out;
+  }
+
   function allPatterns(){
-    return [...quantityPatterns(),...manualItemPatterns()]
+    return [
+      ...quantityPatterns(),
+      ...manualItemPatterns(),
+      ...ingredientOffPatterns(),
+      ...standardOffPatterns(),
+      ...optionalToStandardPatterns()
+    ]
       .filter(p=>{
         const d=learning.dismissed[p.key];
         if(!d)return true;
