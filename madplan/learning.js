@@ -120,6 +120,28 @@
     saveLocal();
   }
 
+  function currentPlanNames(){
+    try{
+      return [...new Set((plan||[]).map(rid=>{const r=byId(rid);return r&&r.name?String(r.name).trim():'';}).filter(Boolean))];
+    }catch(e){return [];}
+  }
+
+  function historyEntries(){
+    try{
+      if(window.madplanMealHistory&&typeof window.madplanMealHistory.entries==='function'){
+        return window.madplanMealHistory.entries()||[];
+      }
+    }catch(e){}
+    return [];
+  }
+
+  function median(values){
+    const a=(values||[]).filter(Number.isFinite).sort((x,y)=>x-y);
+    if(!a.length)return null;
+    const m=Math.floor(a.length/2);
+    return a.length%2?a[m]:(a[m-1]+a[m])/2;
+  }
+
   function recipeContextForItem(item){
     try{
       const target=norm(item),seen=new Map();
@@ -199,6 +221,28 @@
     }catch(e){}
   }
 
+  function applyRecipeItemRules(){
+    try{
+      learning.rules.filter(r=>r.type==='recipe_item_add').forEach(rule=>{
+        const selected=(plan||[]).filter(rid=>{
+          const r=byId(rid);
+          return r&&norm(r.name)===norm(rule.recipe);
+        });
+        if(!selected.length)return;
+        const recipe=byId(selected[0]);
+        if((recipe.ingredients||[]).some(i=>norm(i.name)===norm(rule.item)))return;
+        const existing=(shopping||[]).find(i=>i.source==='ret'&&norm(i.name)===norm(rule.item)&&norm(i.category||'')===norm(rule.category||''));
+        const addQty=Math.max(1,Number(rule.qty)||1)*selected.length;
+        if(existing)existing.qty=(Number(existing.qty)||1)+addQty;
+        else shopping.push({
+          id:id(),name:cleanName(rule.item),category:rule.category||'andet',
+          qty:addQty,on:true,source:'ret'
+        });
+      });
+      shopping.sort((a,b)=>CATS.indexOf(a.category)-CATS.indexOf(b.category)||String(a.source||'').localeCompare(String(b.source||''),'da')||a.name.localeCompare(b.name,'da'));
+    }catch(e){}
+  }
+
   function ingredientRuleFor(day,item){
     try{
       const r=byId(plan[day]);
@@ -248,7 +292,7 @@
   function applyRulesNow(){
     if(applying)return;
     applying=true;
-    try{applyOptionalRules();applyQuantityRules();applyStandardRules();}catch(e){}
+    try{applyOptionalRules();applyQuantityRules();applyStandardRules();applyRecipeItemRules();}catch(e){}
     applying=false;
   }
 
@@ -260,6 +304,7 @@
       const out=oldBuildShopping(opts);
       applyQuantityRules();
       applyStandardRules();
+      applyRecipeItemRules();
       return out;
     };
   }
@@ -269,7 +314,8 @@
     addItem=function(cat,name){
       const n=cleanName(name),wasOptional=optionalContains(cat,n);
       record(wasOptional?'optional_add':'manual_add',{
-        item:n,category:cat||'andet',source:'manuelt'
+        item:n,category:cat||'andet',source:'manuelt',
+        meta:{plan:currentPlanNames()}
       });
       return oldAddItem(cat,name);
     };
@@ -534,14 +580,172 @@
     return out;
   }
 
+  function recipeItemPatterns(){
+    const events=learning.events.filter(e=>(e.type==='manual_add'||e.type==='optional_add')&&e.item&&e.meta&&Array.isArray(e.meta.plan)&&e.meta.plan.length);
+    const grouped=new Map();
+    events.forEach(e=>{
+      const k=norm(e.category)+'|'+norm(e.item);
+      if(!grouped.has(k))grouped.set(k,[]);
+      grouped.get(k).push(e);
+    });
+    const history=historyEntries();
+    const out=[];
+
+    grouped.forEach(eventsForItem=>{
+      const perWeek=finalPerWeek(eventsForItem);
+      if(distinctWeeks(perWeek)<3)return;
+      const candidates=new Map();
+
+      perWeek.forEach(e=>{
+        [...new Set((e.meta.plan||[]).map(String))].forEach(recipe=>{
+          const k=norm(recipe);
+          if(!candidates.has(k))candidates.set(k,{recipe,weeks:new Set()});
+          candidates.get(k).weeks.add(e.week);
+        });
+      });
+
+      const scored=[];
+      candidates.forEach(c=>{
+        const matches=c.weeks.size;
+        if(matches<3)return;
+        const additionWeeks=distinctWeeks(perWeek);
+        const precision=matches/Math.max(1,additionWeeks);
+        const histOpp=history.filter(w=>new Set((w.recipes||[]).map(norm)).has(norm(c.recipe))).length;
+        const currentOpp=currentPlanNames().some(x=>norm(x)===norm(c.recipe))?1:0;
+        const opportunities=histOpp+currentOpp;
+        const hitRate=opportunities?matches/opportunities:0;
+        if(precision<0.75||opportunities<3||hitRate<0.60)return;
+
+        const recipe=(recipes||[]).find(r=>norm(r.name)===norm(c.recipe));
+        const sample=perWeek[perWeek.length-1];
+        if(recipe&&(recipe.ingredients||[]).some(i=>norm(i.name)===norm(sample.item)))return;
+
+        scored.push({
+          recipe:c.recipe,matches,precision,hitRate,
+          score:matches*precision*hitRate,
+          sample
+        });
+      });
+
+      scored.sort((a,b)=>b.score-a.score);
+      if(!scored.length)return;
+      if(scored.length>1&&scored[1].score>scored[0].score*0.82)return;
+
+      const best=scored[0],sample=best.sample;
+      const key='recipe-add|'+norm(best.recipe)+'|'+norm(sample.item);
+      if(ruleByKey(key))return;
+      out.push({
+        key,type:'recipe_item_add',evidence:best.matches,
+        recipe:best.recipe,item:sample.item,category:sample.category,qty:1,
+        title:'Madplan har opdaget et mønster',
+        text:'Vi tilføjer '+sample.item+' næsten hver gang '+best.recipe+' er på planen.',
+        question:'Føj '+sample.item+' til '+best.recipe+' fremover?'
+      });
+    });
+    return out;
+  }
+
+  function cyclePatterns(){
+    const WEEK_MS=7*86400000;
+    const groups=new Map();
+    learning.events.filter(e=>(e.type==='manual_add'||e.type==='optional_add')&&e.item).forEach(e=>{
+      const k=norm(e.category)+'|'+norm(e.item);
+      if(!groups.has(k))groups.set(k,[]);
+      groups.get(k).push(e);
+    });
+    const out=[];
+    groups.forEach(events=>{
+      const perWeek=finalPerWeek(events).sort((a,b)=>String(a.ts).localeCompare(String(b.ts)));
+      if(perWeek.length<4)return;
+      const times=perWeek.map(e=>Date.parse(e.week)||Date.parse(e.ts)).filter(Number.isFinite).sort((a,b)=>a-b);
+      if(times.length<4)return;
+      const gaps=[];
+      for(let i=1;i<times.length;i++)gaps.push((times[i]-times[i-1])/WEEK_MS);
+      const typical=median(gaps);
+      if(!typical||typical<1.5||typical>8.5)return;
+      const deviations=gaps.map(x=>Math.abs(x-typical));
+      const mad=median(deviations)||0;
+      if(mad>Math.max(0.8,typical*0.32))return;
+
+      const last=times[times.length-1],since=(Date.now()-last)/WEEK_MS;
+      if(since<typical*0.85)return;
+      const sample=perWeek[perWeek.length-1];
+      if(perWeek.some(e=>e.week===weekKey()))return;
+
+      const rounded=Math.max(2,Math.round(typical));
+      const key='cycle-due|'+norm(sample.category)+'|'+norm(sample.item)+'|'+weekKey();
+      out.push({
+        key,type:'cycle_due',evidence:perWeek.length,
+        item:sample.item,category:sample.category,qty:1,
+        title:'Madplan har opdaget en rytme',
+        text:'Vi plejer at tilføje '+sample.item+' cirka hver '+rounded+'. uge, og det er omtrent nu.',
+        question:'Tilføj '+sample.item+' denne uge?',
+        yesLabel:'Tilføj denne uge',
+        noLabel:'Ikke nu'
+      });
+    });
+    return out;
+  }
+
+  function describeRecipeChange(p){
+    if(p.type==='recipe_qty')return p.item+' → '+p.qty;
+    if(p.type==='ingredient_off')return 'fravælg '+p.item;
+    if(p.type==='recipe_item_add')return 'tilføj '+p.item;
+    return p.item||p.type;
+  }
+
+  function bundleRecipePatterns(patterns){
+    const groups=new Map();
+    patterns.filter(p=>p.recipe&&['recipe_qty','ingredient_off','recipe_item_add'].includes(p.type)).forEach(p=>{
+      const k=norm(p.recipe);
+      if(!groups.has(k))groups.set(k,[]);
+      groups.get(k).push(p);
+    });
+    const hidden=new Set(),bundles=[];
+    groups.forEach(items=>{
+      if(items.length<2)return;
+      items.forEach(p=>hidden.add(p.key));
+      const recipe=items[0].recipe;
+      const evidence=Math.min(...items.map(p=>Number(p.evidence)||0));
+      bundles.push({
+        key:'bundle|'+norm(recipe)+'|'+items.map(p=>p.key).sort().join('~'),
+        type:'recipe_bundle',recipe,evidence,
+        components:items,
+        title:'Madplan har opdaget et samlet mønster',
+        text:'Når '+recipe+' er på planen, laver vi flere af de samme rettelser igen og igen: '+items.map(describeRecipeChange).join(', ')+'.',
+        question:'Husk disse ændringer samlet?',
+        yesLabel:'Ja, husk dem',
+        noLabel:'Ikke nu'
+      });
+    });
+    return [...patterns.filter(p=>!hidden.has(p.key)),...bundles];
+  }
+
+  function preferenceMultiplier(recipeName){
+    const target=norm(recipeName);
+    const inWeeks=new Set(),outWeeks=new Set();
+    learning.events.filter(e=>e.type==='meal_change').forEach(e=>{
+      if(norm(e.after)===target)inWeeks.add(e.week);
+      if(norm(e.before)===target)outWeeks.add(e.week);
+    });
+    const signals=inWeeks.size+outWeeks.size;
+    if(signals<2)return 1;
+    const up=Math.min(0.24,inWeeks.size*0.06);
+    const down=Math.min(0.22,outWeeks.size*0.055);
+    return Math.max(0.74,Math.min(1.28,1+up-down));
+  }
+
   function allPatterns(){
-    return [
+    const raw=[
       ...quantityPatterns(),
       ...manualItemPatterns(),
       ...ingredientOffPatterns(),
       ...standardOffPatterns(),
-      ...optionalToStandardPatterns()
-    ]
+      ...optionalToStandardPatterns(),
+      ...recipeItemPatterns(),
+      ...cyclePatterns()
+    ];
+    return bundleRecipePatterns(raw)
       .filter(p=>{
         const d=learning.dismissed[p.key];
         if(!d)return true;
@@ -551,17 +755,36 @@
       .sort((a,b)=>b.evidence-a.evidence);
   }
 
-  function acceptPattern(key){
-    const p=allPatterns().find(x=>x.key===key);
-    if(!p)return;
-    const rule={
+  function ruleFromPattern(p){
+    return {
       key:p.key,type:p.type,createdAt:nowIso(),evidence:p.evidence,
       recipe:p.recipe||null,item:p.item||null,category:p.category||null,qty:p.qty||null
     };
-    learning.rules=learning.rules.filter(r=>r.key!==rule.key);
-    learning.rules.push(rule);
+  }
+
+  function acceptPattern(key){
+    const p=allPatterns().find(x=>x.key===key);
+    if(!p)return;
+
+    if(p.type==='cycle_due'){
+      delete learning.dismissed[key];
+      record('cycle_accept',{item:p.item||null,meta:{evidence:p.evidence}});
+      saveLocal();
+      try{addItem(p.category||'andet',p.item);renderAll();}catch(e){}
+      return;
+    }
+
+    const patterns=p.type==='recipe_bundle'?(p.components||[]):[p];
+    patterns.forEach(component=>{
+      const rule=ruleFromPattern(component);
+      learning.rules=learning.rules.filter(r=>r.key!==rule.key);
+      learning.rules.push(rule);
+    });
     delete learning.dismissed[key];
-    record('rule_accept',{item:p.item||null,recipe:p.recipe||null,meta:{ruleType:p.type,evidence:p.evidence}});
+    record('rule_accept',{
+      item:p.item||null,recipe:p.recipe||null,
+      meta:{ruleType:p.type,evidence:p.evidence,components:patterns.map(x=>x.type)}
+    });
     saveLocal();
     applyRulesNow();
     try{buildShopping();saveSession();renderAll();}catch(e){}
@@ -610,7 +833,7 @@
         +'</div>'
         +'<div style="font-weight:650;line-height:1.35">'+esc(p.text)+'</div>'
         +'<div class="sub" style="margin-top:5px">'+esc(p.question)+'</div>'
-        +'<div class="row" style="margin-top:10px;gap:8px"><button class="btn small" data-learn-yes="'+esc(p.key)+'">Ja, husk det</button><button class="btn small ghost" data-learn-no="'+esc(p.key)+'">Ikke nu</button></div>'
+        +'<div class="row" style="margin-top:10px;gap:8px"><button class="btn small" data-learn-yes="'+esc(p.key)+'">'+esc(p.yesLabel||'Ja, husk det')+'</button><button class="btn small ghost" data-learn-no="'+esc(p.key)+'">'+esc(p.noLabel||'Ikke nu')+'</button></div>'
         +nav;
 
       const anchor=document.getElementById('meal-history-suggestions');
@@ -664,6 +887,7 @@
     events:()=>learning.events.slice(),
     rules:()=>learning.rules.slice(),
     patterns:()=>allPatterns(),
+    preferenceMultiplier:name=>preferenceMultiplier(name),
     counts:()=>({
       events:learning.events.length,
       rules:learning.rules.length,
