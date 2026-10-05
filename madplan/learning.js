@@ -4,6 +4,7 @@
   const DISMISS_DAYS=28;
   let learning=loadLocal();
   let applying=false;
+  let patternIndex=0;
 
   function norm(x){
     return String(x||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -424,45 +425,59 @@
       if(!host||!host.parentNode)return;
       const old=document.getElementById('madplan-learning-card');
       if(old)old.remove();
+
       const patterns=allPatterns();
-      const p=patterns[0];
+      if(!patterns.length){
+        patternIndex=0;
+        return;
+      }
+
+      patternIndex=((patternIndex%patterns.length)+patterns.length)%patterns.length;
+      const p=patterns[patternIndex];
       const box=document.createElement('div');
       box.id='madplan-learning-card';
       box.className='card no-print';
       box.style.padding='13px 16px';
       box.style.marginBottom='14px';
 
-      if(p){
-        box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:6px">'+esc(p.title)+'</div>'
-          +'<div style="font-weight:650;line-height:1.35">'+esc(p.text)+'</div>'
-          +'<div class="sub" style="margin-top:5px">'+esc(p.question)+'</div>'
-          +'<div class="row" style="margin-top:10px;gap:8px"><button class="btn small" data-learn-yes="'+esc(p.key)+'">Ja, husk det</button><button class="btn small ghost" data-learn-no="'+esc(p.key)+'">Ikke nu</button></div>';
-      }else{
-        let hidden=false;
-        try{hidden=localStorage.getItem('madplan_learning_demo_hidden_v1')==='1';}catch(e){}
-        if(hidden)return;
-        box.innerHTML='<div class="row" style="justify-content:space-between;align-items:flex-start"><div><div class="sub" style="font-weight:700;margin-bottom:6px">Madplan lærer</div>'
-          +'<div class="sub">Når vi gentager de samme ændringer, kan Madplan foreslå at huske dem permanent.</div></div>'
-          +'<button class="btn small ghost" data-learn-hide-demo="1">Skjul</button></div>'
-          +'<div style="margin-top:10px;padding:11px 12px;border-radius:12px;background:var(--soft)">'
-          +'<div class="sub" style="font-weight:700;margin-bottom:4px">Sådan kan et forslag se ud</div>'
-          +'<div style="font-weight:650;line-height:1.35">Vi har ændret tortellini til 2 i tre forskellige uger, når Pasta med pesto har været på planen.</div>'
-          +'<div class="sub" style="margin-top:5px">Gør 2 til standard for Pasta med pesto?</div>'
-          +'<div class="row" style="margin-top:9px;gap:8px;opacity:.55"><button class="btn small" disabled>Ja, husk det</button><button class="btn small ghost" disabled>Ikke nu</button></div></div>'
-          +'<details style="margin-top:9px"><summary class="sub" style="cursor:pointer">Hvad holder Madplan øje med?</summary>'
-          +'<div class="sub" style="margin-top:6px">Retvalg og udskiftninger, generatorvalg, ingrediensfravalg, mængdeændringer, manuelle varer samt ændringer i antal dage og kød-dage. Observationerne kan senere bruges til flere typer mønstre.</div></details>';
-      }
+      const nav=patterns.length>1
+        ?'<div class="row" style="margin-top:10px;justify-content:space-between;align-items:center">'
+          +'<button class="btn small ghost" data-learn-prev="1">← Forrige</button>'
+          +'<span class="sub">'+(patternIndex+1)+' af '+patterns.length+'</span>'
+          +'<button class="btn small ghost" data-learn-next="1">Næste →</button></div>'
+        :'';
+
+      box.innerHTML='<div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">'
+        +'<div class="sub" style="font-weight:700;margin-bottom:6px">'+esc(p.title)+'</div>'
+        +(patterns.length>1?'<div class="sub" style="white-space:nowrap">'+(patternIndex+1)+' af '+patterns.length+'</div>':'')
+        +'</div>'
+        +'<div style="font-weight:650;line-height:1.35">'+esc(p.text)+'</div>'
+        +'<div class="sub" style="margin-top:5px">'+esc(p.question)+'</div>'
+        +'<div class="row" style="margin-top:10px;gap:8px"><button class="btn small" data-learn-yes="'+esc(p.key)+'">Ja, husk det</button><button class="btn small ghost" data-learn-no="'+esc(p.key)+'">Ikke nu</button></div>'
+        +nav;
 
       const anchor=document.getElementById('meal-history-suggestions');
       if(anchor&&anchor.parentNode===host.parentNode)anchor.insertAdjacentElement('afterend',box);
       else host.parentNode.insertBefore(box,host);
 
-      box.querySelectorAll('[data-learn-yes]').forEach(b=>b.onclick=()=>acceptPattern(b.dataset.learnYes));
-      box.querySelectorAll('[data-learn-no]').forEach(b=>b.onclick=()=>dismissPattern(b.dataset.learnNo));
-      const hide=box.querySelector('[data-learn-hide-demo]');
-      if(hide)hide.onclick=()=>{
-        try{localStorage.setItem('madplan_learning_demo_hidden_v1','1');}catch(e){}
-        box.remove();
+      box.querySelectorAll('[data-learn-yes]').forEach(b=>b.onclick=()=>{
+        acceptPattern(b.dataset.learnYes);
+        patternIndex=Math.min(patternIndex,Math.max(0,allPatterns().length-1));
+      });
+      box.querySelectorAll('[data-learn-no]').forEach(b=>b.onclick=()=>{
+        dismissPattern(b.dataset.learnNo);
+        patternIndex=Math.min(patternIndex,Math.max(0,allPatterns().length-1));
+      });
+
+      const prev=box.querySelector('[data-learn-prev]');
+      if(prev)prev.onclick=()=>{
+        patternIndex=(patternIndex-1+patterns.length)%patterns.length;
+        renderLearningCard();
+      };
+      const next=box.querySelector('[data-learn-next]');
+      if(next)next.onclick=()=>{
+        patternIndex=(patternIndex+1)%patterns.length;
+        renderLearningCard();
       };
     }catch(e){}
   }
