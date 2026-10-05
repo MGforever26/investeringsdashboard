@@ -120,8 +120,11 @@
       archiveCurrentWeek();
       const m=oldNewWeekMeta();
       const now=new Date().toISOString();
+      const suggestions=calculateSuggestionState();
       m.createdAt=now;
       m.lastSeenAt=now;
+      m.suggestionIds=(suggestions.ids||[]).slice(0,5);
+      m.suggestionCold=!!suggestions.cold;
       return m;
     };
   }
@@ -145,6 +148,8 @@
         o.w=o.w||{};
         o.w.createdAt=(activeWeek&&activeWeek.createdAt)||null;
         o.w.lastSeenAt=(activeWeek&&activeWeek.lastSeenAt)||null;
+        o.w.suggestionIds=(activeWeek&&Array.isArray(activeWeek.suggestionIds))?activeWeek.suggestionIds.slice(0,5):[];
+        o.w.suggestionCold=!!(activeWeek&&activeWeek.suggestionCold);
         saveHistory();
       }catch(e){}
       return o;
@@ -213,35 +218,53 @@
     };
   }
 
-  function realSuggestionIds(limit=5){
+  function rankedSuggestionIds(limit=5){
     if(mealHistory.length<2||!Array.isArray(recipes)) return [];
-    const inPlan=new Set(Array.isArray(plan)?plan:[]);
     return recipes.map(r=>{
       const s=historyStats(r.name);
       return {r,s,score:recipeWeight(r)};
-    }).filter(x=>x.s.usedWeeks>0&&x.s.lastIndex>0&&!inPlan.has(x.r.id))
+    }).filter(x=>x.s.usedWeeks>0&&x.s.lastIndex>0)
       .sort((a,b)=>b.score-a.score||b.s.lastIndex-a.s.lastIndex||a.r.name.localeCompare(b.r.name,'da'))
       .slice(0,limit).map(x=>x.r.id);
   }
 
-  function previewSuggestionIds(limit=5){
-    const inPlan=new Set(Array.isArray(plan)?plan:[]);
+  function starterSuggestionIds(limit=5){
     const preferred=['dahl','rød karry','fiskefrikadeller','Pasta bolognese','bygotto','tacos','butter chicken','pasta carbonara'];
     const ids=[];
     preferred.forEach(name=>{
       const r=(recipes||[]).find(x=>norm(x.name)===norm(name));
-      if(r&&!inPlan.has(r.id)&&!ids.includes(r.id))ids.push(r.id);
+      if(r&&!ids.includes(r.id))ids.push(r.id);
     });
-    (recipes||[]).forEach(r=>{
-      if(ids.length<limit&&!inPlan.has(r.id)&&!ids.includes(r.id))ids.push(r.id);
-    });
+    (recipes||[]).forEach(r=>{if(ids.length<limit&&!ids.includes(r.id))ids.push(r.id);});
     return ids.slice(0,limit);
   }
 
-  function suggestionState(){
-    const real=realSuggestionIds();
+  function calculateSuggestionState(){
+    const real=rankedSuggestionIds();
     if(real.length)return {ids:real,cold:false};
-    return {ids:previewSuggestionIds(),cold:mealHistory.length<2};
+    return {ids:starterSuggestionIds(),cold:mealHistory.length<2};
+  }
+
+  function saveWeekSuggestions(state){
+    try{
+      if(!activeWeek)return state;
+      activeWeek.suggestionIds=(state.ids||[]).slice(0,5);
+      activeWeek.suggestionCold=!!state.cold;
+      if(typeof store!=='undefined'&&store&&store.set)store.set('madplan_week_meta_v1',activeWeek);
+    }catch(e){}
+    return state;
+  }
+
+  function suggestionState(){
+    try{
+      if(activeWeek&&Array.isArray(activeWeek.suggestionIds)&&activeWeek.suggestionIds.length){
+        const valid=activeWeek.suggestionIds.filter(v=>(recipes||[]).some(r=>r.id===v)).slice(0,5);
+        if(valid.length){
+          return {ids:valid,cold:!!activeWeek.suggestionCold};
+        }
+      }
+    }catch(e){}
+    return saveWeekSuggestions(calculateSuggestionState());
   }
 
   function suggestionIds(limit=5){
