@@ -22,6 +22,7 @@
       endedAt:x&&x.endedAt||null,
       label:x&&x.label||'',
       recipes:Array.isArray(x&&x.recipes)?x.recipes.map(v=>String(v||'').trim()).filter(Boolean):[],
+      suggestions:Array.isArray(x&&x.suggestions)?x.suggestions.map(v=>String(v||'').trim()).filter(Boolean):[],
       confidence:Number(x&&x.confidence)||0
     })).filter(x=>x.startedAt&&x.endedAt&&x.recipes.length)
       .sort((a,b)=>new Date(a.endedAt)-new Date(b.endedAt))
@@ -88,11 +89,15 @@
       const confidence=archiveConfidence(meta,names,endedAt);
       if(confidence<4.5) return false;
       if(mealHistory.some(x=>x.startedAt===meta.createdAt)) return false;
+      const suggestions=(Array.isArray(meta.suggestionIds)?meta.suggestionIds:[])
+        .map(rid=>{const r=(recipes||[]).find(x=>x.id===rid);return r&&r.name?String(r.name).trim():'';})
+        .filter(Boolean);
       mealHistory.push({
         startedAt:meta.createdAt,
         endedAt,
         label:meta.label||'',
         recipes:names,
+        suggestions,
         confidence:Math.round(confidence*10)/10
       });
       mealHistory=normalizeHistory(mealHistory);
@@ -156,23 +161,88 @@
     };
   }
 
+  function median(values){
+    const a=(values||[]).filter(Number.isFinite).sort((x,y)=>x-y);
+    if(!a.length)return null;
+    const m=Math.floor(a.length/2);
+    return a.length%2?a[m]:(a[m-1]+a[m])/2;
+  }
+
   function historyStats(recipeName){
     const target=norm(recipeName);
     const newest=[...mealHistory].sort((a,b)=>new Date(b.endedAt)-new Date(a.endedAt));
-    let usedWeeks=0,lastIndex=-1;
+    let usedWeeks=0,lastIndex=-1,suggestedWeeks=0,skippedSuggestions=0;
+    const usedDates=[];
     newest.forEach((w,idx)=>{
-      if(new Set((w.recipes||[]).map(norm)).has(target)){
+      const used=new Set((w.recipes||[]).map(norm)).has(target);
+      const suggested=new Set((w.suggestions||[]).map(norm)).has(target);
+      if(used){
         usedWeeks++;
-        if(lastIndex<0) lastIndex=idx;
+        const ts=Date.parse(w.endedAt||w.startedAt||'');
+        if(Number.isFinite(ts))usedDates.push(ts);
+        if(lastIndex<0)lastIndex=idx;
+      }
+      if(suggested){
+        suggestedWeeks++;
+        if(!used)skippedSuggestions++;
       }
     });
-    return {usedWeeks,lastIndex,total:newest.length};
+    usedDates.sort((a,b)=>a-b);
+    return {usedWeeks,lastIndex,total:newest.length,suggestedWeeks,skippedSuggestions,usedDates};
+  }
+
+  function recurrenceMultiplier(s){
+    if(!s||s.usedDates.length<3)return 1;
+    const gaps=[];
+    for(let i=1;i<s.usedDates.length;i++)gaps.push((s.usedDates[i]-s.usedDates[i-1])/(7*DAY_MS));
+    const typical=median(gaps);
+    if(!typical||typical<1)return 1;
+    const since=(Date.now()-s.usedDates[s.usedDates.length-1])/(7*DAY_MS);
+    const ratio=since/typical;
+    if(ratio<0.45)return 0.72;
+    if(ratio<0.70)return 0.86;
+    if(ratio<0.90)return 0.96;
+    if(ratio<1.15)return 1.08;
+    if(ratio<1.50)return 1.15;
+    return 1.22;
+  }
+
+  function seasonalMultiplier(s){
+    if(!s||s.usedDates.length<4||mealHistory.length<20)return 1;
+    const chronological=[...mealHistory].sort((a,b)=>new Date(a.endedAt)-new Date(b.endedAt));
+    const first=Date.parse(chronological[0]&&chronological[0].endedAt||'');
+    const last=Date.parse(chronological[chronological.length-1]&&chronological[chronological.length-1].endedAt||'');
+    if(!first||!last||last-first<180*DAY_MS)return 1;
+    const month=new Date().getMonth();
+    const near=s.usedDates.filter(ts=>{
+      const m=new Date(ts).getMonth();
+      const d=Math.abs(m-month);
+      return Math.min(d,12-d)<=1;
+    }).length;
+    const expected=s.usedDates.length*3/12;
+    if(near>=2&&near>expected*1.5)return 1.12;
+    if(expected>=1.5&&near<expected*0.45)return 0.92;
+    return 1;
+  }
+
+  function suggestionResponseMultiplier(s){
+    if(!s||s.skippedSuggestions<2)return 1;
+    return Math.max(0.70,1-Math.min(3,s.skippedSuggestions)*0.09);
+  }
+
+  function learnedPreferenceMultiplier(recipeName){
+    try{
+      if(window.madplanLearning&&typeof window.madplanLearning.preferenceMultiplier==='function'){
+        return Number(window.madplanLearning.preferenceMultiplier(recipeName))||1;
+      }
+    }catch(e){}
+    return 1;
   }
 
   function recipeWeight(r){
-    if(!mealHistory.length) return 1;
+    if(!mealHistory.length) return learnedPreferenceMultiplier(r.name);
     const s=historyStats(r.name);
-    if(!s.usedWeeks) return 0.85;
+    if(!s.usedWeeks) return 0.85*learnedPreferenceMultiplier(r.name);
     const freq=s.usedWeeks/Math.max(1,s.total);
     let recency=1;
     if(s.lastIndex===0) recency=0.18;
@@ -180,13 +250,44 @@
     else if(s.lastIndex===2) recency=1.00;
     else if(s.lastIndex===3) recency=1.20;
     else recency=Math.min(1.55,1.30+(s.lastIndex-4)*0.06);
-    return Math.max(0.12,(0.65+1.9*freq)*recency);
+    const score=(0.65+1.9*freq)
+      *recency
+      *recurrenceMultiplier(s)
+      *seasonalMultiplier(s)
+      *suggestionResponseMultiplier(s)
+      *learnedPreferenceMultiplier(r.name);
+    return Math.max(0.12,Math.min(4.5,score));
   }
 
-  function weightedPick(pool,count){
+  function pairCompatibility(candidate,context){
+    if(mealHistory.length<8||!context||!context.length)return 1;
+    const cn=norm(candidate.name),total=mealHistory.length;
+    const cWeeks=mealHistory.filter(w=>new Set((w.recipes||[]).map(norm)).has(cn)).length;
+    if(cWeeks<3)return 1;
+    let mult=1,signals=0;
+    (context||[]).forEach(other=>{
+      const on=norm(other&&other.name);
+      if(!on||on===cn)return;
+      let oWeeks=0,co=0;
+      mealHistory.forEach(w=>{
+        const set=new Set((w.recipes||[]).map(norm));
+        const a=set.has(cn),b=set.has(on);
+        if(b)oWeeks++;
+        if(a&&b)co++;
+      });
+      if(oWeeks<3)return;
+      const expected=(cWeeks*oWeeks)/Math.max(1,total);
+      if(co>=2&&co>expected*1.35){mult*=1.07;signals++;}
+      else if(total>=12&&cWeeks>=4&&oWeeks>=4&&co===0){mult*=0.96;signals++;}
+    });
+    if(!signals)return 1;
+    return Math.max(0.88,Math.min(1.16,mult));
+  }
+
+  function weightedPick(pool,count,context=[]){
     const left=[...(pool||[])],picked=[];
     while(left.length&&picked.length<count){
-      const weights=left.map(r=>recipeWeight(r));
+      const weights=left.map(r=>recipeWeight(r)*pairCompatibility(r,[...context,...picked]));
       const total=weights.reduce((a,b)=>a+b,0);
       let x=Math.random()*(total||left.length),idx=0;
       if(total){
@@ -204,12 +305,12 @@
     generatePlan=function(){
       const meat=(recipes||[]).filter(r=>r.type==='kød');
       const other=(recipes||[]).filter(r=>r.type!=='kød');
-      let pick=weightedPick(meat,Math.min(meatDays,meat.length));
+      let pick=weightedPick(meat,Math.min(meatDays,meat.length),[]);
       const chosen=new Set(pick.map(r=>r.id));
-      pick=pick.concat(weightedPick(other.filter(r=>!chosen.has(r.id)),Math.max(0,days-pick.length)));
+      pick=pick.concat(weightedPick(other.filter(r=>!chosen.has(r.id)),Math.max(0,days-pick.length),pick));
       pick.forEach(r=>chosen.add(r.id));
       if(pick.length<days){
-        pick=pick.concat(weightedPick((recipes||[]).filter(r=>!chosen.has(r.id)),days-pick.length));
+        pick=pick.concat(weightedPick((recipes||[]).filter(r=>!chosen.has(r.id)),days-pick.length,pick));
       }
       plan=shuffle(pick).slice(0,days).map(r=>r.id);
       excluded={};
@@ -361,6 +462,11 @@
 
   window.madplanMealHistory={
     count:()=>mealHistory.length,
+    entries:()=>mealHistory.map(x=>Object.assign({},x,{recipes:[...(x.recipes||[])],suggestions:[...(x.suggestions||[])]})),
+    score:name=>{
+      const r=(recipes||[]).find(x=>norm(x.name)===norm(name));
+      return r?recipeWeight(r):null;
+    },
     suggestions:()=>suggestionIds().map(x=>{const r=(recipes||[]).find(y=>y.id===x);return r?r.name:x;})
   };
 })();
