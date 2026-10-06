@@ -488,8 +488,8 @@
         "category": "konserves og tørvarer"
       },
       {
-        "name": "chili",
-        "category": "andet"
+        "name": "chiliflager",
+        "category": "mel og gryn"
       },
       {
         "name": "ris",
@@ -731,7 +731,7 @@
       },
       {
         "name": "spidskommenfrø",
-        "category": "konserves og tørvarer"
+        "category": "mel og gryn"
       },
       {
         "name": "fennikel",
@@ -743,7 +743,7 @@
       },
       {
         "name": "kanel",
-        "category": "konserves og tørvarer"
+        "category": "mel og gryn"
       },
       {
         "name": "citron",
@@ -903,7 +903,7 @@
       },
       {
         "name": "grøntsagsbouillon",
-        "category": "andet"
+        "category": "konserves og tørvarer"
       },
       {
         "name": "hakkede tomater",
@@ -1033,7 +1033,7 @@
       },
       {
         "name": "grøntsagsbouillon",
-        "category": "andet"
+        "category": "konserves og tørvarer"
       },
       {
         "name": "bacon",
@@ -1066,8 +1066,8 @@
         "category": "grøntsager og frugt"
       },
       {
-        "name": "chili",
-        "category": "andet"
+        "name": "chiliflager",
+        "category": "mel og gryn"
       },
       {
         "name": "citron",
@@ -1101,19 +1101,19 @@
       },
       {
         "name": "sukker",
-        "category": "andet"
+        "category": "mel og gryn"
       },
       {
         "name": "lage fra ananas",
-        "category": "andet"
+        "category": "konserves og tørvarer"
       },
       {
         "name": "grøntsagsbouillon",
-        "category": "andet"
+        "category": "konserves og tørvarer"
       },
       {
         "name": "majsstivelse",
-        "category": "andet"
+        "category": "mel og gryn"
       }
     ]
   },
@@ -1167,15 +1167,15 @@
     "ingredients": [
       {
         "name": "frisk pasta",
-        "category": "andet"
+        "category": "mælkeprodukter og pålæg"
       },
       {
         "name": "frisk pasta",
-        "category": "andet"
+        "category": "mælkeprodukter og pålæg"
       },
       {
         "name": "hasselnødder",
-        "category": "konserves og tørvarer"
+        "category": "mel og gryn"
       },
       {
         "name": "brune champignon",
@@ -1213,11 +1213,11 @@
     "ingredients": [
       {
         "name": "tortellini",
-        "category": "andet"
+        "category": "mælkeprodukter og pålæg"
       },
       {
         "name": "tortellini",
-        "category": "andet"
+        "category": "mælkeprodukter og pålæg"
       },
       {
         "name": "mascarpone",
@@ -1325,11 +1325,11 @@
     "ingredients": [
       {
         "name": "tortellini",
-        "category": "andet"
+        "category": "mælkeprodukter og pålæg"
       },
       {
         "name": "tortellini",
-        "category": "andet"
+        "category": "mælkeprodukter og pålæg"
       },
       {
         "name": "pinjekærner",
