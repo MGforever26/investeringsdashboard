@@ -1640,5 +1640,99 @@
         "category": "mælkeprodukter og pålæg"
       }
     ]
+  },
+  {
+    "name": "squashsuppe",
+    "type": "vegetar",
+    "ingredients": [
+      {
+        "name": "squash",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "kartofler",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "løg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hvidløg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "grøntsagsbouillon",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "fløde",
+        "category": "mælkeprodukter og pålæg"
+      }
+    ]
+  },
+  {
+    "name": "laks i penang",
+    "type": "fisk",
+    "ingredients": [
+      {
+        "name": "laks",
+        "category": "andet"
+      },
+      {
+        "name": "ris",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "kokosmælk",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "panang karrypasta",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "broccoli",
+        "category": "grøntsager og frugt"
+      }
+    ]
+  },
+  {
+    "name": "butternut squash suppe",
+    "type": "vegetar",
+    "ingredients": [
+      {
+        "name": "butternut squash",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "kartofler",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "løg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "ingefær",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hvidløg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "edamamebønner",
+        "category": "frostvarer"
+      },
+      {
+        "name": "grønkål",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "grøntsagsbouillon",
+        "category": "konserves og tørvarer"
+      }
+    ]
   }
 ]
