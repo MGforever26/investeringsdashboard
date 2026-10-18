@@ -303,14 +303,21 @@
 
   if(typeof generatePlan==='function'){
     generatePlan=function(){
-      const meat=(recipes||[]).filter(r=>r.type==='kød');
-      const other=(recipes||[]).filter(r=>r.type!=='kød');
+      // Reservér ugens fem forslag, så den genererede plan består af andre retter.
+      const all=recipes||[];
+      const reserved=new Set((activeWeek&&activeWeek.suggestionIds)||[]);
+      const available=all.filter(r=>!reserved.has(r.id));
+      const requiredMeat=Math.min(Math.max(0,meatDays),days,all.filter(r=>r.type==='kød').length);
+      // Brug kun forslagene, hvis det ellers ikke er muligt at udfylde planen.
+      const pool=available.length>=days&&available.filter(r=>r.type==='kød').length>=requiredMeat?available:all;
+      const meat=pool.filter(r=>r.type==='kød');
+      const other=pool.filter(r=>r.type!=='kød');
       let pick=weightedPick(meat,Math.min(meatDays,meat.length),[]);
       const chosen=new Set(pick.map(r=>r.id));
       pick=pick.concat(weightedPick(other.filter(r=>!chosen.has(r.id)),Math.max(0,days-pick.length),pick));
       pick.forEach(r=>chosen.add(r.id));
       if(pick.length<days){
-        pick=pick.concat(weightedPick((recipes||[]).filter(r=>!chosen.has(r.id)),days-pick.length,pick));
+        pick=pick.concat(weightedPick(pool.filter(r=>!chosen.has(r.id)),days-pick.length,pick));
       }
       plan=shuffle(pick).slice(0,days).map(r=>r.id);
       excluded={};
@@ -341,9 +348,12 @@
   }
 
   function calculateSuggestionState(){
-    const real=rankedSuggestionIds();
-    if(real.length)return {ids:real,cold:false};
-    return {ids:starterSuggestionIds(),cold:mealHistory.length<2};
+    const ranked=rankedSuggestionIds(5);
+    const ids=[...ranked];
+    // Supplér ved kort historik, så der som udgangspunkt stadig vises fem forslag.
+    starterSuggestionIds(5).forEach(id=>{if(ids.length<5&&!ids.includes(id))ids.push(id);});
+    (recipes||[]).forEach(r=>{if(ids.length<5&&!ids.includes(r.id))ids.push(r.id);});
+    return {ids:ids.slice(0,5),cold:!ranked.length&&mealHistory.length<2};
   }
 
   function saveWeekSuggestions(state){
@@ -456,7 +466,11 @@
 
       box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">Oplagte denne uge</div>'
         +'<div class="row" style="gap:7px">'
-        +suggested.map(r=>'<button type="button" class="pill" data-suggestion-id="'+esc(r.id)+'" aria-expanded="'+(r.id===selectedSuggestionId?'true':'false')+'" style="cursor:pointer;opacity:.88;font-family:inherit;border:1px solid '+(r.id===selectedSuggestionId?'var(--accent)':'transparent')+'">'+esc(cap(r.name))+'</button>').join('')
+        +suggested.map(r=>{
+          const assigned=(plan||[]).flatMap((id,i)=>id===r.id?[i+1]:[]);
+          const label=assigned.length?' · Dag '+assigned.join(', '):'';
+          return '<button type="button" class="pill" data-suggestion-id="'+esc(r.id)+'" aria-expanded="'+(r.id===selectedSuggestionId?'true':'false')+'" style="cursor:pointer;opacity:.88;font-family:inherit;border:1px solid '+(r.id===selectedSuggestionId?'var(--accent)':'transparent')+'">'+esc(cap(r.name))+esc(label)+'</button>';
+        }).join('')
         +'</div>'
         +chooser
         +'<div class="sub" style="margin-top:6px">'+esc(note)+'</div>';
