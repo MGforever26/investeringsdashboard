@@ -130,6 +130,8 @@
       m.lastSeenAt=now;
       m.suggestionIds=(suggestions.ids||[]).slice(0,5);
       m.suggestionCold=!!suggestions.cold;
+      m.suggestionsAligned=true;
+      m.suggestionAssignments={};
       return m;
     };
   }
@@ -155,6 +157,8 @@
         o.w.lastSeenAt=(activeWeek&&activeWeek.lastSeenAt)||null;
         o.w.suggestionIds=(activeWeek&&Array.isArray(activeWeek.suggestionIds))?activeWeek.suggestionIds.slice(0,5):[];
         o.w.suggestionCold=!!(activeWeek&&activeWeek.suggestionCold);
+        o.w.suggestionsAligned=!!(activeWeek&&activeWeek.suggestionsAligned);
+        o.w.suggestionAssignments=(activeWeek&&activeWeek.suggestionAssignments)||{};
         saveHistory();
       }catch(e){}
       return o;
@@ -320,6 +324,7 @@
         pick=pick.concat(weightedPick(pool.filter(r=>!chosen.has(r.id)),days-pick.length,pick));
       }
       plan=shuffle(pick).slice(0,days).map(r=>r.id);
+      if(activeWeek)activeWeek.suggestionsAligned=true;
       excluded={};
       buildShopping();
       saveSession();
@@ -347,12 +352,17 @@
     return ids.slice(0,limit);
   }
 
-  function calculateSuggestionState(){
-    const ranked=rankedSuggestionIds(5);
+  function calculateSuggestionState(exclude=new Set()){
+    const all=recipes||[];
+    const ranked=rankedSuggestionIds(all.length).filter(id=>!exclude.has(id));
     const ids=[...ranked];
-    // Supplér ved kort historik, så der som udgangspunkt stadig vises fem forslag.
-    starterSuggestionIds(5).forEach(id=>{if(ids.length<5&&!ids.includes(id))ids.push(id);});
-    (recipes||[]).forEach(r=>{if(ids.length<5&&!ids.includes(r.id))ids.push(r.id);});
+    // Selv ved kort historik giver vi fem konkrete alternativer.
+    starterSuggestionIds(all.length).forEach(id=>{
+      if(ids.length<5&&!exclude.has(id)&&!ids.includes(id))ids.push(id);
+    });
+    all.forEach(r=>{
+      if(ids.length<5&&!exclude.has(r.id)&&!ids.includes(r.id))ids.push(r.id);
+    });
     return {ids:ids.slice(0,5),cold:!ranked.length&&mealHistory.length<2};
   }
 
@@ -366,16 +376,40 @@
     return state;
   }
 
+  // Éngangsrettelse af gamle uger. Efterfølgende manuelle valg må
+  // gerne overlappe forslagene, som så forbliver uændrede.
+  function ensureAlternativeSuggestions(){
+    try{
+      if(!activeWeek||!Array.isArray(plan)||!plan.length)return false;
+      if(activeWeek.suggestionsAligned===true)return false;
+      const excluded=new Set(plan);
+      const oldIds=(activeWeek.suggestionIds||[]).filter(id=>(recipes||[]).some(r=>r.id===id));
+      const unique=[...new Set(oldIds)];
+      const count=Math.min(5,Math.max(0,(recipes||[]).length-excluded.size));
+      const needsChange=unique.length<count||unique.some(id=>excluded.has(id));
+      if(needsChange)saveWeekSuggestions(calculateSuggestionState(excluded));
+      activeWeek.suggestionsAligned=true;
+      activeWeek.suggestionAssignments={};
+      if(typeof store!=='undefined'&&store&&store.set)store.set('madplan_week_meta_v1',activeWeek);
+      return needsChange;
+    }catch(e){return false;}
+  }
+
   function suggestionState(){
     try{
+      ensureAlternativeSuggestions();
       if(activeWeek&&Array.isArray(activeWeek.suggestionIds)&&activeWeek.suggestionIds.length){
-        const valid=activeWeek.suggestionIds.filter(v=>(recipes||[]).some(r=>r.id===v)).slice(0,5);
-        if(valid.length){
+        const valid=[...new Set(activeWeek.suggestionIds.filter(id=>(recipes||[]).some(r=>r.id===id)))].slice(0,5);
+        if(valid.length===5||valid.length===(recipes||[]).filter(r=>!plan.includes(r.id)).length)
           return {ids:valid,cold:!!activeWeek.suggestionCold};
-        }
       }
     }catch(e){}
-    return saveWeekSuggestions(calculateSuggestionState());
+    const state=saveWeekSuggestions(calculateSuggestionState(new Set(plan||[])));
+    if(activeWeek){
+      activeWeek.suggestionsAligned=true;
+      if(typeof store!=='undefined'&&store&&store.set)store.set('madplan_week_meta_v1',activeWeek);
+    }
+    return state;
   }
 
   function suggestionIds(limit=5){
@@ -422,8 +456,14 @@
         b.onclick=()=>{
           const day=Number(b.dataset.mealDay),recipeId=b.dataset.mealId;
           if(!Number.isInteger(day)||!recipeId)return;
+          const fromSuggestion=b.dataset.suggestionChoice==='1';
+          const changed=plan[day]!==recipeId;
+          const assignments=Object.assign({},(activeWeek&&activeWeek.suggestionAssignments)||{});
+          if(changed)Object.keys(assignments).forEach(id=>{if(assignments[id]===day)delete assignments[id];});
+          if(fromSuggestion)assignments[recipeId]=day;
+          if(activeWeek)activeWeek.suggestionAssignments=assignments;
           selectedSuggestionId=null;
-          if(plan[day]===recipeId){renderPlan();return;}
+          if(!changed){if(fromSuggestion)saveSession();renderPlan();return;}
           plan[day]=recipeId;
           Object.keys(excluded).forEach(k=>{if(k.startsWith(day+'|'))delete excluded[k];});
           buildShopping();
@@ -460,15 +500,18 @@
       const chooser=chosen
         ?'<div class="row" style="gap:7px;margin-top:9px;align-items:center">'
           +'<span class="sub" style="margin-right:2px">Vælg dag:</span>'
-          +(plan||[]).map((currentId,day)=>'<button type="button" class="pill" data-meal-day="'+day+'" data-meal-id="'+esc(chosen.id)+'" aria-label="Vælg '+esc(cap(chosen.name))+' til dag '+(day+1)+'" style="cursor:pointer;font-family:inherit;padding:7px 10px;background:'+(currentId===chosen.id?'var(--soft)':'#fff')+';border:1px solid var(--line)">Dag '+(day+1)+(currentId===chosen.id?' ✓':'')+'</button>').join('')
+          +(plan||[]).map((currentId,day)=>{
+             const selected=activeWeek&&activeWeek.suggestionAssignments&&activeWeek.suggestionAssignments[chosen.id]===day&&currentId===chosen.id;
+             return '<button type="button" class="pill" data-meal-day="'+day+'" data-meal-id="'+esc(chosen.id)+'" data-suggestion-choice="1" aria-label="Vælg '+esc(cap(chosen.name))+' til dag '+(day+1)+'" style="cursor:pointer;font-family:inherit;padding:7px 10px;background:'+(selected?'var(--soft)':'#fff')+';border:1px solid var(--line)">Dag '+(day+1)+(selected?' ✓':'')+'</button>';
+           }).join('')
           +'</div>'
         :'';
 
       box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">Oplagte denne uge</div>'
         +'<div class="row" style="gap:7px">'
         +suggested.map(r=>{
-          const assigned=(plan||[]).flatMap((id,i)=>id===r.id?[i+1]:[]);
-          const label=assigned.length?' · Dag '+assigned.join(', '):'';
+          const assignedDay=activeWeek&&activeWeek.suggestionAssignments&&activeWeek.suggestionAssignments[r.id];
+          const label=Number.isInteger(assignedDay)&&plan[assignedDay]===r.id?' · Dag '+(assignedDay+1):'';
           return '<button type="button" class="pill" data-suggestion-id="'+esc(r.id)+'" aria-expanded="'+(r.id===selectedSuggestionId?'true':'false')+'" style="cursor:pointer;opacity:.88;font-family:inherit;border:1px solid '+(r.id===selectedSuggestionId?'var(--accent)':'transparent')+'">'+esc(cap(r.name))+esc(label)+'</button>';
         }).join('')
         +'</div>'
@@ -502,6 +545,7 @@
       const r=(recipes||[]).find(x=>norm(x.name)===norm(name));
       return r?recipeWeight(r):null;
     },
-    suggestions:()=>suggestionIds().map(x=>{const r=(recipes||[]).find(y=>y.id===x);return r?r.name:x;})
+    suggestions:()=>suggestionIds().map(x=>{const r=(recipes||[]).find(y=>y.id===x);return r?r.name:x;}),
+    ensureAlternativeSuggestions
   };
 })();
