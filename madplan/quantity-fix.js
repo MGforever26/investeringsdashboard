@@ -11,10 +11,13 @@
 
     try{
       plan.map(byId).forEach((r,day)=>{
-        (r.ingredients||[]).forEach(i=>{
-          if(!ingOn(day,i)) return;
+        const ext=window.madplanIngredientQuantities;
+        const ingredients=ext&&typeof ext.contributions==='function'
+          ?ext.contributions(day,r)
+          :(r.ingredients||[]).filter(i=>ingOn(day,i)).map(i=>({name:i.name,qty:1}));
+        ingredients.forEach(i=>{
           const k=normName(i.name);
-          recipe.set(k,(recipe.get(k)||0)+1);
+          recipe.set(k,(recipe.get(k)||0)+(Number(i.qty)||1));
         });
       });
     }catch(e){}
