@@ -436,9 +436,12 @@
         +'</div></details>';
       return '<div class="card day"><div class="bubble">'+(i+1)+'</div><div><div class="row" style="justify-content:space-between"><h3>Dag '+(i+1)+'</h3><span class="pill">'+esc(r.type)+'</span></div>'
         +picker
-        +'<details><summary class="sub">Ingredienser ('+r.ingredients.filter(x=>ingOn(i,x)).length+'/'+r.ingredients.length+' valgt)</summary><div style="margin-top:8px">'
-        +r.ingredients.map((x,idx)=>'<div class="item" style="grid-template-columns:32px 1fr"><button class="check '+(ingOn(i,x)?'on':'')+'" onclick="toggleIng('+i+','+idx+')">'+(ingOn(i,x)?'✓':'')+'</button><div><b>'+esc(x.name)+'</b><div class="sub" style="margin:2px 0 0">'+esc(x.category)+'</div></div></div>').join('')
-        +'</div></details></div></div>';
+        +(window.madplanIngredientQuantities&&typeof window.madplanIngredientQuantities.renderDay==='function'
+          ?window.madplanIngredientQuantities.renderDay(i,r)
+          :'<details><summary class="sub">Ingredienser ('+r.ingredients.filter(x=>ingOn(i,x)).length+'/'+r.ingredients.length+' valgt)</summary><div style="margin-top:8px">'
+            +r.ingredients.map((x,idx)=>'<div class="item" style="grid-template-columns:32px 1fr"><button class="check '+(ingOn(i,x)?'on':'')+'" onclick="toggleIng('+i+','+idx+')">'+(ingOn(i,x)?'✓':'')+'</button><div><b>'+esc(x.name)+'</b><div class="sub" style="margin:2px 0 0">'+esc(x.category)+'</div></div></div>').join('')
+            +'</div></details>')
+        +'</div></div>';
     };
   }
 
