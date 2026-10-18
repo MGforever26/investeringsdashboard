@@ -1730,5 +1730,101 @@
         "category": "konserves og tørvarer"
       }
     ]
+  },
+  {
+    "name": "ramen med sprød kylling",
+    "type": "kød",
+    "ingredients": [
+      {
+        "name": "kylling",
+        "category": "andet"
+      },
+      {
+        "name": "nudler",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "æg",
+        "category": "mælkeprodukter og pålæg"
+      },
+      {
+        "name": "pak choi",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "forårsløg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "koriander",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hvidløg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "ingefær",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "lime",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "grøntsagsbouillon",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "miso",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "fishsauce",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "pankorasp",
+        "category": "mel og gryn"
+      },
+      {
+        "name": "sesamfrø",
+        "category": "mel og gryn"
+      }
+    ]
+  },
+  {
+    "name": "laks med pasta i fløde- og spinatsauce",
+    "type": "fisk",
+    "ingredients": [
+      {
+        "name": "laks",
+        "category": "andet"
+      },
+      {
+        "name": "pasta",
+        "category": "konserves og tørvarer"
+      },
+      {
+        "name": "fløde",
+        "category": "mælkeprodukter og pålæg"
+      },
+      {
+        "name": "spinat",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "løg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "hvidløg",
+        "category": "grøntsager og frugt"
+      },
+      {
+        "name": "citron",
+        "category": "grøntsager og frugt"
+      }
+    ]
   }
 ]
