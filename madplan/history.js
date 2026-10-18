@@ -412,8 +412,10 @@
         b.onclick=()=>{
           const day=Number(b.dataset.mealDay),recipeId=b.dataset.mealId;
           if(!Number.isInteger(day)||!recipeId)return;
+          selectedSuggestionId=null;
+          if(plan[day]===recipeId){renderPlan();return;}
           plan[day]=recipeId;
-          excluded={};
+          Object.keys(excluded).forEach(k=>{if(k.startsWith(day+'|'))delete excluded[k];});
           buildShopping();
           saveSession();
           renderAll();
@@ -422,6 +424,8 @@
     }catch(e){}
   }
 
+  let selectedSuggestionId=null;
+
   function renderSuggestionStrip(){
     try{
       const host=document.querySelector('#plan .grid.days');
@@ -429,12 +433,10 @@
       const old=document.getElementById('meal-history-suggestions');
       if(old)old.remove();
       const state=suggestionState();
-      if(!state.ids.length)return;
-      const names=state.ids.map(v=>{
-        const r=(recipes||[]).find(x=>x.id===v);
-        return r?r.name:'';
-      }).filter(Boolean);
-      if(!names.length)return;
+      const suggested=state.ids.map(id=>(recipes||[]).find(r=>r.id===id)).filter(Boolean);
+      if(!suggested.length)return;
+      if(!suggested.some(r=>r.id===selectedSuggestionId))selectedSuggestionId=null;
+
       const box=document.createElement('div');
       box.id='meal-history-suggestions';
       box.className='card no-print';
@@ -443,10 +445,29 @@
       const note=state.cold
         ?'Her fremhæves retter, vi ofte vælger, men ikke har fået for nylig. Forslagene bliver skarpere, efterhånden som vi bygger historik op. De samme retter ligger øverst i retvælgerne nedenfor.'
         :'Baseret på hvad vi plejer at vælge, og hvor længe siden retterne sidst var på planen. De samme forslag ligger øverst i retvælgerne nedenfor.';
+
+      const chosen=suggested.find(r=>r.id===selectedSuggestionId);
+      const chooser=chosen
+        ?'<div class="row" style="gap:7px;margin-top:9px;align-items:center">'
+          +'<span class="sub" style="margin-right:2px">Vælg dag:</span>'
+          +(plan||[]).map((currentId,day)=>'<button type="button" class="pill" data-meal-day="'+day+'" data-meal-id="'+esc(chosen.id)+'" aria-label="Vælg '+esc(cap(chosen.name))+' til dag '+(day+1)+'" style="cursor:pointer;font-family:inherit;padding:7px 10px;background:'+(currentId===chosen.id?'var(--soft)':'#fff')+';border:1px solid var(--line)">Dag '+(day+1)+(currentId===chosen.id?' ✓':'')+'</button>').join('')
+          +'</div>'
+        :'';
+
       box.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:7px">Oplagte denne uge</div>'
-        +'<div class="row" style="gap:7px">'+names.map(n=>'<span class="pill" style="cursor:default;opacity:.88">'+esc(cap(n))+'</span>').join('')+'</div>'
+        +'<div class="row" style="gap:7px">'
+        +suggested.map(r=>'<button type="button" class="pill" data-suggestion-id="'+esc(r.id)+'" aria-expanded="'+(r.id===selectedSuggestionId?'true':'false')+'" style="cursor:pointer;opacity:.88;font-family:inherit;border:1px solid '+(r.id===selectedSuggestionId?'var(--accent)':'transparent')+'">'+esc(cap(r.name))+'</button>').join('')
+        +'</div>'
+        +chooser
         +'<div class="sub" style="margin-top:6px">'+esc(note)+'</div>';
       host.parentNode.insertBefore(box,host);
+      box.querySelectorAll('[data-suggestion-id]').forEach(button=>{
+        button.onclick=()=>{
+          const id=button.dataset.suggestionId;
+          selectedSuggestionId=(id===selectedSuggestionId)?null:id;
+          renderPlan();
+        };
+      });
     }catch(e){}
   }
 
