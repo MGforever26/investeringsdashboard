@@ -262,10 +262,19 @@
         buildShopping({keepManual:false});
       }
       applyShoppingSnapshot(data.week.payload);
+      // Også gamle, allerede aktive uger skal få fem alternativer uden
+      // at brugerens madplan eller indkøbsliste nulstilles.
+      let repairedSuggestions=false;
+      try{
+        if(window.madplanMealHistory&&typeof window.madplanMealHistory.ensureAlternativeSuggestions==='function'){
+          repairedSuggestions=window.madplanMealHistory.ensureAlternativeSuggestions();
+        }
+      }catch(e){}
       saveSession(false);
       writeLocalState();
       renderAll();
       syncing=false;
+      if(repairedSuggestions)saveSession();
     }catch(e){syncing=false;}
   }
 
