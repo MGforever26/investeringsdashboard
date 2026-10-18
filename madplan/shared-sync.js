@@ -2,6 +2,28 @@
   const API='https://script.google.com/macros/s/AKfycbzJyz-EbpidFmHsylCUqJ16uuDPHWUDfQde2bcOwYs6egreJwKqeKsYUshl8ov7RnA/exec';
   const CURRENT_ID='madplan-faelles-aktiv';
   const LOCAL_STATE_KEY='madplan_state_local_v1';
+  // Beskyt den seneste uge mod forsinkede svar fra en tidligere uge.
+  const LAST_RESET_KEY='madplan_last_new_week_reset_v2';
+  function lastReset(){
+    try{
+      const v=JSON.parse(localStorage.getItem(LAST_RESET_KEY)||'null');
+      return v && v.createdAt ? v : null;
+    }catch(e){return null;}
+  }
+  function rememberReset(){
+    try{
+      if(activeWeek && activeWeek.createdAt) localStorage.setItem(LAST_RESET_KEY,JSON.stringify({
+        createdAt:activeWeek.createdAt, changedAt:activeWeek.changedAt
+      }));
+    }catch(e){}
+  }
+  function olderThanLastReset(remoteMeta){
+    const reset=lastReset();
+    if(!reset) return false;
+    const localEpoch=Date.parse(reset.createdAt);
+    const remoteEpoch=Date.parse((remoteMeta||{}).createdAt||'');
+    return Number.isFinite(localEpoch) && (!Number.isFinite(remoteEpoch) || remoteEpoch < localEpoch);
+  }
   if(!API) return;
   let syncing=false,timer=null,dirty=false;
 
@@ -214,13 +236,23 @@
       let remoteMeta=data.week.payload.w||{};
       let remoteChanged=remoteMeta.changedAt||remoteMeta.updatedAt||data.week.version||data.week.updatedAt||null;
       let localChanged=(activeWeek&&activeWeek.changedAt)||null;
+      // En indledende tvungen hentning må ikke overskrive en nyere lokal uge.
+      if(weekId===CURRENT_ID && olderThanLastReset(remoteMeta)){
+        saveRemoteNow(true);
+        return;
+      }
+      if(weekId===CURRENT_ID && localChanged && remoteChanged &&
+         new Date(remoteChanged)<=new Date(localChanged)) return;
       if(!force && localChanged && remoteChanged && new Date(remoteChanged)<=new Date(localChanged)) return;
       syncing=true;
       shopping=[];
       pendingShopping=null;
       applyState(data.week.payload);
       activeWeek=Object.assign({},activeWeek||{},remoteMeta,{id:data.week.id||weekId,changedAt:remoteChanged,updatedAt:remoteChanged,savedAt:remoteMeta.savedAt||data.week.updatedAt||null,lastEditor:data.week.lastEditor||remoteMeta.lastEditor||'app'});
-      if(weekId===CURRENT_ID) activeWeek.label=currentLabel();
+      if(weekId===CURRENT_ID){
+        activeWeek.label=currentLabel();
+        rememberReset();
+      }
       saveWeekMeta();
       if(pendingShopping){
         shopping=pendingShopping.map(i=>{let source=i.source==='ekstra'?'manuelt':(i.source||'manuelt');return {id:Math.random().toString(36).slice(2,9),name:cleanName(i.name),category:resolvedCategory(i.name,i.category,source),qty:Number(i.qty)||1,on:i.on!==false,source};});
@@ -276,6 +308,7 @@
     activeWeek.updatedAt=now;
     activeWeek.savedAt=null;
     activeWeek.lastEditor=null;
+    rememberReset();
     dirty=true;
     saveWeekMeta();
     plan=[]; excluded={}; shopping=[]; pendingShopping=null;
