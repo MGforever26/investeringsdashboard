@@ -66,6 +66,10 @@
     if(['hakkede tomater','tomatpure','tomatpuré','kokosmælk','kokosmaelk','ris','grødris','grodris','nudler','bulgur','couscous','linser','bønner','bonner','kikærter','kikaerter','pasta','lasagneplader','suppehorn'].includes(n)) return 'konserves og tørvarer';
     if(['blomkålsris','blomkalsris'].includes(n)) return 'frostvarer';
     if(['spidskommen','spidskommenfrø','spidskommenfro','karry','kardemomme','stødt koriander','stodt koriander','gurkemeje','sennepsfrø','sennepsfro','krydderier','kanel','sesamfrø','sesamfro','peanuts','honning','mandler','rosiner','pinjekærner','pinjekaerner'].includes(n)) return 'mel og gryn';
+    // Samme butikskategorier som i opskriftsdatabasen og kategori-reglerne.
+    if(['grøntsagsbouillon','grontsagsbouillon','lage fra ananas'].includes(n)) return 'konserves og tørvarer';
+    if(['sukker','majsstivelse','laurbærblade','laurbaerblade'].includes(n)) return 'mel og gryn';
+    if(['frisk pasta','tortellini'].includes(n)) return 'mælkeprodukter og pålæg';
     if(['kylling'].includes(n)) return 'andet';
     if(['pølser','pølse','polser','polse','bacon','pulled pork','pepperoni','kyllingepålæg','kyllingepalaeg'].includes(n)) return 'mælkeprodukter og pålæg';
     return cat||'andet';
