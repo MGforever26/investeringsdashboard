@@ -332,7 +332,10 @@
     try{
       if(!weekId || syncing || sending || dirty) return;
       const data=await jsonp({action:'get',id:weekId});
+      // En ændring kan være lavet på telefonen, mens serveren svarede.
+      if(sending||dirty)return;
       if(!data || !data.ok || !data.found || !data.week || !data.week.payload){
+        showSyncStatus('Fælles madplan kunne ikke findes');
         return;
       }
       try{window.madplanLastRemotePayload=data.week.payload;}catch(e){}
@@ -344,8 +347,18 @@
         saveRemoteNow(true);
         return;
       }
-      if(localChanged && remoteChanged && new Date(remoteChanged)<=new Date(localChanged)){
-        if(new Date(remoteChanged).getTime()===new Date(localChanged).getTime()){
+      if(localChanged && remoteChanged && new Date(remoteChanged)<new Date(localChanged)){
+        if(weekId===CURRENT_ID){
+          // Genforsøg ældre lokale ændringer, der tidligere blev markeret
+          // som gemt uden serverkvittering.
+          dirty=true;
+          showSyncStatus('Nyere lokale ændringer afventer synkronisering');
+          saveRemoteNow(true);
+        }
+        return;
+      }
+      if(localChanged && remoteChanged && new Date(remoteChanged).getTime()===new Date(localChanged).getTime()){
+        {
           activeWeek.lastEditor=data.week.lastEditor||remoteMeta.lastEditor||activeWeek.lastEditor;
           activeWeek.savedAt=data.week.updatedAt||remoteMeta.savedAt||activeWeek.savedAt;
           saveWeekMeta();
