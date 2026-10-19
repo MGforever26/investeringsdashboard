@@ -15,16 +15,43 @@
     }catch(e){return [];}
   }
 
+  function calendarWeekKey(timestamp){
+    try{
+      const date=new Date(timestamp);
+      if(!Number.isFinite(date.getTime()))return '';
+      const week=isoWeek(date);
+      return week.y+'-W'+String(week.w).padStart(2,'0');
+    }catch(e){return '';}
+  }
+
   function normalizeHistory(list){
     if(!Array.isArray(list)) return [];
-    return list.map(x=>({
+    const valid=list.map(x=>({
       startedAt:x&&x.startedAt||null,
       endedAt:x&&x.endedAt||null,
       label:x&&x.label||'',
       recipes:Array.isArray(x&&x.recipes)?x.recipes.map(v=>String(v||'').trim()).filter(Boolean):[],
       suggestions:Array.isArray(x&&x.suggestions)?x.suggestions.map(v=>String(v||'').trim()).filter(Boolean):[],
       confidence:Number(x&&x.confidence)||0
-    })).filter(x=>x.startedAt&&x.endedAt&&x.recipes.length)
+    })).filter(x=>x.startedAt&&x.endedAt&&x.recipes.length);
+    // Flere nulstillinger i samme kalenderuge må højst give én
+    // afsluttet uge i statistikken – behold den mest troværdige.
+    const byWeek=new Map();
+    valid.forEach(x=>{
+      const key=calendarWeekKey(x.startedAt)||x.startedAt;
+      const existing=byWeek.get(key);
+      if(!existing){
+        byWeek.set(key,x);
+        return;
+      }
+      const duration=x=>Math.max(0,Date.parse(x.endedAt)-Date.parse(x.startedAt));
+      if(x.confidence>existing.confidence
+         ||(x.confidence===existing.confidence&&duration(x)>duration(existing))
+         ||(x.confidence===existing.confidence&&duration(x)===duration(existing)&&x.endedAt>existing.endedAt)){
+        byWeek.set(key,x);
+      }
+    });
+    return [...byWeek.values()]
       .sort((a,b)=>new Date(a.endedAt)-new Date(b.endedAt))
       .slice(-MAX_WEEKS);
   }
@@ -81,14 +108,23 @@
     return score;
   }
 
+  function credibleWeek(meta,names,endedAt){
+    if(archiveConfidence(meta,names,endedAt)<4.5)return false;
+    const elapsed=(Date.parse(endedAt)-Date.parse(meta.createdAt))/DAY_MS;
+    // Midtuge-testforløb er ikke en reel afsluttet uge.
+    if(elapsed<5&&calendarWeekKey(meta.createdAt)===calendarWeekKey(endedAt))return false;
+    return true;
+  }
+
   function archiveCurrentWeek(){
     try{
       const names=currentRecipeNames();
       const endedAt=new Date().toISOString();
       const meta=activeWeek||{};
       const confidence=archiveConfidence(meta,names,endedAt);
-      if(confidence<4.5) return false;
-      if(mealHistory.some(x=>x.startedAt===meta.createdAt)) return false;
+      if(!credibleWeek(meta,names,endedAt))return false;
+      if(mealHistory.some(x=>x.startedAt===meta.createdAt
+        ||calendarWeekKey(x.startedAt)===calendarWeekKey(meta.createdAt)))return false;
       const suggestions=(Array.isArray(meta.suggestionIds)?meta.suggestionIds:[])
         .map(rid=>{const r=(recipes||[]).find(x=>x.id===rid);return r&&r.name?String(r.name).trim():'';})
         .filter(Boolean);
@@ -549,6 +585,7 @@
       return r?recipeWeight(r):null;
     },
     suggestions:()=>suggestionIds().map(x=>{const r=(recipes||[]).find(y=>y.id===x);return r?r.name:x;}),
-    ensureAlternativeSuggestions
+    ensureAlternativeSuggestions,
+    currentWeekEligible:()=>credibleWeek(activeWeek||{},currentRecipeNames(),new Date().toISOString())
   };
 })();
