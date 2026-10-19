@@ -358,13 +358,11 @@
         return;
       }
       if(localChanged && remoteChanged && new Date(remoteChanged).getTime()===new Date(localChanged).getTime()){
-        {
-          activeWeek.lastEditor=data.week.lastEditor||remoteMeta.lastEditor||activeWeek.lastEditor;
-          activeWeek.savedAt=data.week.updatedAt||remoteMeta.savedAt||activeWeek.savedAt;
-          saveWeekMeta();
-          refreshWeekHeader();
-          showSyncStatus('Synkroniseret');
-        }
+        activeWeek.lastEditor=data.week.lastEditor||remoteMeta.lastEditor||activeWeek.lastEditor;
+        activeWeek.savedAt=data.week.updatedAt||remoteMeta.savedAt||activeWeek.savedAt;
+        saveWeekMeta();
+        refreshWeekHeader();
+        showSyncStatus('Synkroniseret');
         return;
       }
       syncing=true;
