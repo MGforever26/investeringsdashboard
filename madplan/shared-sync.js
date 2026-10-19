@@ -200,7 +200,10 @@
 
   function retryUnconfirmed(){
     clearTimeout(retryTimer);
-    if(retryCount>=3)return;
+    if(retryCount>=3){
+      showSyncStatus('Synkronisering mislykkedes – kontrollér forbindelsen');
+      return;
+    }
     retryCount++;
     retryTimer=setTimeout(()=>{if(dirty&&!sending)saveRemoteNow(false);},retryCount*2500);
   }
