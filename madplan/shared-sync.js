@@ -224,7 +224,7 @@
       // Do not clear 'dirty' before a real read-back confirms the save.
       showSyncStatus('Synkroniserer…');
       await fetch(API,{
-        method:'POST',mode:'no-cors',keepalive:false,
+        method:'POST',mode:'no-cors',keepalive:true,
         headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
         body
       });
@@ -453,6 +453,12 @@
     useCurrentPlanId();
     loadRemote(CURRENT_ID,true);
   }
+
+  // Also refresh while both phones remain open. Focus/visibility still checks immediately.
+  setInterval(()=>{
+    if(document.hidden||dirty||sending||syncing)return;
+    loadRemote(activeWeek.id||CURRENT_ID,false);
+  },60000);
 
   window.addEventListener('pagehide',()=>saveRemoteNow(false));
   window.addEventListener('beforeunload',()=>saveRemoteNow(false));
