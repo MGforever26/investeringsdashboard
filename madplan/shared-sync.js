@@ -185,7 +185,7 @@
       let count=allEvents.length;
       while(count>=0){
         payload=Object.assign({},source,{
-          learning:Object.assign({},source.learning,{events:allEvents.slice(-count)})
+          learning:Object.assign({},source.learning,{events:count===0?[]:allEvents.slice(-count)})
         });
         body=args(payload);
         if(JSON.stringify(payload).length<=rawLimit && body.toString().length<=encodedLimit)break;
