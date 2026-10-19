@@ -25,7 +25,8 @@
     return Number.isFinite(localEpoch) && (!Number.isFinite(remoteEpoch) || remoteEpoch < localEpoch);
   }
   if(!API) return;
-  let syncing=false,timer=null,dirty=false;
+  let syncing=false,timer=null,dirty=false,sending=false,retryCount=0;
+  let retryTimer=null;
 
   function currentLabel(){
     try{return 'Uge '+isoWeek().w}catch(e){return (activeWeek&&activeWeek.label)||'Uge'}
@@ -35,12 +36,38 @@
     try{localStorage.setItem('madplan_week_meta_v1',JSON.stringify(activeWeek));}catch(e){}
   }
 
+  function deviceEditor(){
+    try{return (localStorage.getItem('madplan_editor_name')||'').trim()||'app';}catch(e){return 'app';}
+  }
+
+  function showSyncStatus(text){
+    try{
+      window.madplanSyncStatus={label:text||''};
+      const node=document.querySelector('[data-week-sync-status]');
+      if(node)node.textContent=text||'';
+    }catch(e){}
+  }
+
+  function refreshWeekHeader(){
+    try{
+      const node=document.querySelector('[data-week-last-change]');
+      if(!node)return;
+      const changed=activeWeek&& (activeWeek.changedAt||activeWeek.updatedAt);
+      const date=typeof formatDateTime==='function'?formatDateTime(changed):(changed?new Date(changed).toLocaleString('da-DK'):'ikke ændret endnu');
+      const editor=activeWeek&&activeWeek.lastEditor;
+      node.textContent='Senest ændret '+date+(editor&&editor!=='app'?' af '+editor:'');
+    }catch(e){}
+  }
+
   function markChanged(){
     try{
       const now=new Date().toISOString();
-      activeWeek=Object.assign({},activeWeek||{}, {changedAt:now, updatedAt:now});
+      activeWeek=Object.assign({},activeWeek||{}, {changedAt:now, updatedAt:now,lastEditor:deviceEditor()});
       dirty=true;
+      retryCount=0;
       saveWeekMeta();
+      showSyncStatus('Synkroniserer…');
+      refreshWeekHeader();
     }catch(e){dirty=true;}
   }
 
@@ -48,6 +75,7 @@
     try{
       activeWeek=Object.assign({},activeWeek||{}, {savedAt:ts||new Date().toISOString(), lastEditor:editor||((activeWeek&&activeWeek.lastEditor)||'app')});
       saveWeekMeta();
+      refreshWeekHeader();
     }catch(e){}
   }
 
@@ -139,30 +167,98 @@
     }catch(e){return false;}
   }
 
-  function saveRemoteNow(force=false){
+  function outgoingBody(weekId,version,editor){
+    const source=stateObj();
+    // Google Sheets cells have a finite size, and keepalive requests have
+    // a 64 KB body limit. Preserve the meal plan and shopping in full, and
+    // only shorten the *remote copy* of historical learning events as needed.
+    let payload=source;
+    const args=data=>new URLSearchParams({
+      action:'save',id:weekId,version,payload:JSON.stringify(data),
+      lastEditor:editor,note:activeWeek.label||''
+    });
+    let body=args(payload);
+    const rawLimit=44000, encodedLimit=55000;
+    if((JSON.stringify(payload).length>rawLimit||body.toString().length>encodedLimit)
+       &&source.learning&&Array.isArray(source.learning.events)){
+      const allEvents=source.learning.events;
+      let count=allEvents.length;
+      while(count>=0){
+        payload=Object.assign({},source,{
+          learning:Object.assign({},source.learning,{events:allEvents.slice(-count)})
+        });
+        body=args(payload);
+        if(JSON.stringify(payload).length<=rawLimit && body.toString().length<=encodedLimit)break;
+        if(count===0)break;
+        count=count<=8?count-1:Math.floor(count*0.75);
+      }
+    }
+    if(JSON.stringify(payload).length>rawLimit || body.toString().length>encodedLimit)
+      throw new Error('Den fælles uge er for stor til at gemme');
+    return body;
+  }
+
+  function retryUnconfirmed(){
+    clearTimeout(retryTimer);
+    if(retryCount>=3)return;
+    retryCount++;
+    retryTimer=setTimeout(()=>{if(dirty&&!sending)saveRemoteNow(false);},retryCount*2500);
+  }
+
+  async function saveRemoteNow(force=false){
+    if(sending||syncing)return;
+    if(!activeWeek||!activeWeek.id||typeof stateObj!=='function')return;
+    if(!force&&!dirty)return;
+    clearTimeout(timer);
+    clearTimeout(retryTimer);
+    sending=true;
+    const weekId=activeWeek.id;
+    const version=activeWeek.changedAt||new Date().toISOString();
+    const editor=deviceEditor();
     try{
       writeLocalState();
-      if(!activeWeek || !activeWeek.id || typeof stateObj!=='function') return;
-      if(!force && !dirty) return;
-      const changedAt=(activeWeek&&activeWeek.changedAt)||new Date().toISOString();
-      const editor=(localStorage.getItem('madplan_editor_name')||'app').trim()||'app';
-      const body=new URLSearchParams({
-        action:'save',
-        id:activeWeek.id,
-        version:changedAt,
-        payload:JSON.stringify(stateObj()),
-        lastEditor:editor,
-        note:activeWeek.label||''
+      const body=outgoingBody(weekId,version,editor);
+      // Do not clear 'dirty' before a real read-back confirms the save.
+      showSyncStatus('Synkroniserer…');
+      await fetch(API,{
+        method:'POST',mode:'no-cors',keepalive:false,
+        headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+        body
       });
-      dirty=false;
-      markSaved(new Date().toISOString(),editor);
-      fetch(API,{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body});
-    }catch(e){}
+      // no-cors returns an opaque response even for server-side errors.
+      // The only reliable confirmation available with this backend is GET.
+      let confirmed=null;
+      for(let attempt=0;attempt<3&&!confirmed;attempt++){
+        if(attempt)await new Promise(resolve=>setTimeout(resolve,600*attempt));
+        const response=await jsonp({action:'get',id:weekId});
+        if(!response||!response.ok||!response.found||!response.week)continue;
+        const remote=response.week, meta=(remote.payload&&remote.payload.w)||{};
+        const stored=remote.version||meta.changedAt||meta.updatedAt;
+        if(stored===version)confirmed=remote;
+      }
+      if(!confirmed)throw new Error('Serveren bekræftede ikke den gemte version');
+      if(activeWeek.id===weekId&&activeWeek.changedAt===version){
+        dirty=false;
+        retryCount=0;
+        markSaved(confirmed.updatedAt||new Date().toISOString(),confirmed.lastEditor||editor);
+        showSyncStatus('Synkroniseret');
+      }
+    }catch(e){
+      dirty=true;
+      showSyncStatus('Synkronisering ikke bekræftet – prøver igen');
+      retryUnconfirmed();
+    }finally{
+      sending=false;
+      if(dirty&&activeWeek&&activeWeek.changedAt!==version){
+        clearTimeout(timer);
+        timer=setTimeout(()=>saveRemoteNow(false),250);
+      }
+    }
   }
 
   function saveRemoteSoon(){
     writeLocalState();
-    if(syncing) return;
+    if(syncing)return;
     clearTimeout(timer);
     timer=setTimeout(()=>saveRemoteNow(false),500);
   }
@@ -231,7 +327,7 @@
 
   async function loadRemote(weekId,force){
     try{
-      if(!weekId || syncing) return;
+      if(!weekId || syncing || sending || dirty) return;
       const data=await jsonp({action:'get',id:weekId});
       if(!data || !data.ok || !data.found || !data.week || !data.week.payload){
         return;
@@ -245,9 +341,16 @@
         saveRemoteNow(true);
         return;
       }
-      if(weekId===CURRENT_ID && localChanged && remoteChanged &&
-         new Date(remoteChanged)<=new Date(localChanged)) return;
-      if(!force && localChanged && remoteChanged && new Date(remoteChanged)<=new Date(localChanged)) return;
+      if(localChanged && remoteChanged && new Date(remoteChanged)<=new Date(localChanged)){
+        if(new Date(remoteChanged).getTime()===new Date(localChanged).getTime()){
+          activeWeek.lastEditor=data.week.lastEditor||remoteMeta.lastEditor||activeWeek.lastEditor;
+          activeWeek.savedAt=data.week.updatedAt||remoteMeta.savedAt||activeWeek.savedAt;
+          saveWeekMeta();
+          refreshWeekHeader();
+          showSyncStatus('Synkroniseret');
+        }
+        return;
+      }
       syncing=true;
       shopping=[];
       pendingShopping=null;
@@ -278,8 +381,12 @@
       writeLocalState();
       renderAll();
       syncing=false;
+      showSyncStatus('Synkroniseret');
       if(repairedSuggestions)saveSession();
-    }catch(e){syncing=false;}
+    }catch(e){
+      syncing=false;
+      showSyncStatus('Kunne ikke kontrollere fælles madplan');
+    }
   }
 
   if(typeof saveSession==='function'){
@@ -346,6 +453,13 @@
 
   window.addEventListener('pagehide',()=>saveRemoteNow(false));
   window.addEventListener('beforeunload',()=>saveRemoteNow(false));
-  window.addEventListener('focus',()=>loadRemote(activeWeek.id||CURRENT_ID,false));
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRemoteNow(false);else loadRemote(activeWeek.id||CURRENT_ID,false);});
+  window.addEventListener('focus',()=>{
+    if(dirty)saveRemoteNow(false);
+    else loadRemote(activeWeek.id||CURRENT_ID,false);
+  });
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){if(dirty)saveRemoteNow(false);}
+    else if(dirty)saveRemoteNow(false);
+    else loadRemote(activeWeek.id||CURRENT_ID,false);
+  });
 })();
