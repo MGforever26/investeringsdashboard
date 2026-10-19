@@ -434,6 +434,20 @@
     }catch(e){}
   }
 
+  function trainingEvents(){
+    // Log alle interaktioner, men lær kun fra kvalificerede madplanuger.
+    // Midlertidige testuger må ikke tælle som tilbagevendende vaner.
+    const confirmed=new Set(historyEntries().map(w=>String(w.startedAt||'')));
+    const current=weekKey();
+    let currentEligible=false;
+    try{
+      currentEligible=!!(window.madplanMealHistory
+        &&typeof window.madplanMealHistory.currentWeekEligible==='function'
+        &&window.madplanMealHistory.currentWeekEligible());
+    }catch(e){}
+    return learning.events.filter(e=>confirmed.has(e.week)||(currentEligible&&e.week===current));
+  }
+
   function distinctWeeks(events){
     return new Set(events.map(e=>e.week)).size;
   }
@@ -446,7 +460,7 @@
 
   function quantityPatterns(){
     const groups=new Map();
-    learning.events.filter(e=>e.type==='shopping_qty'&&e.source==='ret'&&e.recipe&&Number(e.after)>0).forEach(e=>{
+    trainingEvents().filter(e=>e.type==='shopping_qty'&&e.source==='ret'&&e.recipe&&Number(e.after)>0).forEach(e=>{
       const k=norm(e.recipe)+'|'+norm(e.item);
       if(!groups.has(k))groups.set(k,[]);
       groups.get(k).push(e);
@@ -480,7 +494,7 @@
 
   function manualItemPatterns(){
     const groups=new Map();
-    learning.events.filter(e=>e.type==='manual_add'&&e.item).forEach(e=>{
+    trainingEvents().filter(e=>e.type==='manual_add'&&e.item).forEach(e=>{
       const k=norm(e.category)+'|'+norm(e.item);
       if(!groups.has(k))groups.set(k,[]);
       groups.get(k).push(e);
@@ -505,7 +519,7 @@
 
   function ingredientOffPatterns(){
     const groups=new Map();
-    learning.events.filter(e=>e.type==='ingredient_toggle'&&e.recipe&&e.item).forEach(e=>{
+    trainingEvents().filter(e=>e.type==='ingredient_toggle'&&e.recipe&&e.item).forEach(e=>{
       const k=norm(e.recipe)+'|'+norm(e.item);
       if(!groups.has(k))groups.set(k,[]);
       groups.get(k).push(e);
@@ -531,7 +545,7 @@
 
   function standardOffPatterns(){
     const groups=new Map();
-    learning.events.filter(e=>e.type==='shopping_toggle'&&e.source==='standard'&&e.item).forEach(e=>{
+    trainingEvents().filter(e=>e.type==='shopping_toggle'&&e.source==='standard'&&e.item).forEach(e=>{
       const k=norm(e.item);
       if(!groups.has(k))groups.set(k,[]);
       groups.get(k).push(e);
@@ -557,7 +571,7 @@
 
   function optionalToStandardPatterns(){
     const groups=new Map();
-    learning.events.filter(e=>e.type==='optional_add'&&e.item).forEach(e=>{
+    trainingEvents().filter(e=>e.type==='optional_add'&&e.item).forEach(e=>{
       const k=norm(e.category)+'|'+norm(e.item);
       if(!groups.has(k))groups.set(k,[]);
       groups.get(k).push(e);
@@ -581,7 +595,7 @@
   }
 
   function recipeItemPatterns(){
-    const events=learning.events.filter(e=>(e.type==='manual_add'||e.type==='optional_add')&&e.item&&e.meta&&Array.isArray(e.meta.plan)&&e.meta.plan.length);
+    const events=trainingEvents().filter(e=>(e.type==='manual_add'||e.type==='optional_add')&&e.item&&e.meta&&Array.isArray(e.meta.plan)&&e.meta.plan.length);
     const grouped=new Map();
     events.forEach(e=>{
       const k=norm(e.category)+'|'+norm(e.item);
@@ -648,7 +662,7 @@
   function cyclePatterns(){
     const WEEK_MS=7*86400000;
     const groups=new Map();
-    learning.events.filter(e=>(e.type==='manual_add'||e.type==='optional_add')&&e.item).forEach(e=>{
+    trainingEvents().filter(e=>(e.type==='manual_add'||e.type==='optional_add')&&e.item).forEach(e=>{
       const k=norm(e.category)+'|'+norm(e.item);
       if(!groups.has(k))groups.set(k,[]);
       groups.get(k).push(e);
@@ -724,7 +738,7 @@
   function preferenceMultiplier(recipeName){
     const target=norm(recipeName);
     const inWeeks=new Set(),outWeeks=new Set();
-    learning.events.filter(e=>e.type==='meal_change').forEach(e=>{
+    trainingEvents().filter(e=>e.type==='meal_change').forEach(e=>{
       if(norm(e.after)===target)inWeeks.add(e.week);
       if(norm(e.before)===target)outWeeks.add(e.week);
     });
