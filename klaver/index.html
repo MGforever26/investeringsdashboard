@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klaver: skalaer og akkorder</title>
+<style>
+:root{--bg:#faf9f6;--card:#fff;--ink:#0b0b0b;--ink2:#52514e;--ink3:#898781;--line:#c3c2b7;--hair:rgba(11,11,11,.12);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a19;--card:#232321;--ink:#f0efec;--ink2:#c3c2b7;--ink3:#898781;--line:#4a4a46;--hair:rgba(255,255,255,.14);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1a1a19;--card:#232321;--ink:#f0efec;--ink2:#c3c2b7;--ink3:#898781;--line:#4a4a46;--hair:rgba(255,255,255,.14);color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0 auto;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px;max-width:520px}
+button,select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{flex:1;padding:10px 4px;font-size:15px}
+.tabs button.on,.keys button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.row{display:flex;gap:8px;margin-bottom:12px}.row>div{flex:1}
+label{display:block;font-size:13px;color:var(--ink2);margin-bottom:4px}
+select{width:100%;font-size:16px;padding:10px}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.keys button{padding:10px 0;font-size:16px}
+.card{background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:14px 12px 10px;margin-top:12px}
+.big{font-size:28px;font-weight:500;line-height:1.1}
+.sub{font-size:13px;color:var(--ink2);margin-top:4px}
+.n{display:inline-block;min-width:34px;text-align:center;padding:5px 7px;margin:2px;border-radius:8px;border:2px solid var(--c);font-weight:500}
+.n.h{background:var(--c);color:#fff}
+.g{display:grid;grid-template-columns:38px repeat(8,1fr);gap:4px;align-items:center;margin-top:12px}
+.g b{font-size:13px;color:var(--ink2);font-weight:500}
+.g .n{display:block;min-width:0;margin:0;padding:6px 0;font-size:14px}
+.g .f{text-align:center;font-size:18px;font-weight:500}
+.r{display:flex;align-items:center;flex-wrap:wrap;gap:2px;padding:8px 4px;border-top:1px solid var(--hair)}
+.r .t{width:62px;font-weight:500}.r .w{width:70px}
+.ar{margin-left:auto;font-size:12px;padding:4px 10px;color:var(--ink3);border-color:var(--hair)}.bk{font-size:14px;padding:6px 12px;margin-bottom:10px}.seg{display:flex;gap:6px;margin-bottom:10px}.seg button{flex:1;padding:8px 4px;font-size:14px}.seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.il{display:grid;grid-template-columns:86px repeat(4,1fr);gap:4px;align-items:center;padding:6px 0;border-top:1px solid var(--hair)}.il i{font-size:12px;color:var(--ink2);font-style:normal}.r.c{display:grid;grid-template-columns:34px 74px repeat(4,1fr);gap:4px}.r.s{display:grid;grid-template-columns:64px repeat(4,1fr) auto;gap:4px}.r.s .hint{grid-column:1/-1}.r.c .t,.r.s .t,.r.c .w{width:auto}.r.c .w{font-size:14px}.r.s .t{font-size:15px}.r .n,.il .n{display:block;min-width:0;margin:0;padding:6px 0;font-size:14px}
+.hint{width:100%;font-size:13px;color:var(--ink2);padding-top:2px}
+#plot{position:relative;height:150px;display:flex;align-items:flex-end;border-bottom:1px solid var(--line);margin-top:14px}
+.b{flex:1;height:100%;position:relative}
+.bar{position:absolute;bottom:0;left:12%;right:12%;border-radius:4px 4px 0 0}
+.bl{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:500}
+.dash{position:absolute;left:0;right:0;bottom:64px;border-top:1px dashed var(--line)}
+#tk{display:flex;margin-top:4px}#tk div{flex:1;text-align:center;font-size:12px;color:var(--ink3)}
+.note{margin-top:12px;font-size:12px;color:var(--ink2);line-height:1.5}
+</style>
+</head>
+<body>
+<div class="tabs"><button>Skalaer</button><button>7-akkorder</button><button>Opslag</button></div>
+<div class="row" id="ctl">
+<div><label for="root">Tone</label><select id="root"></select></div>
+<div id="ct"><label for="type">Akkordtype</label><select id="type"></select></div>
+<div id="ci"><label for="inv">Omvending</label><select id="inv"><option value="0">Grundstilling</option><option value="1">1. omv.</option><option value="2">2. omv.</option><option value="3">3. omv.</option></select></div>
+</div>
+<div class="keys" id="keys"></div>
+<div id="out"></div>
+<script>
+var N=['C','D','E','F','G','A','H'],nat=[0,2,4,5,7,9,11];
+var cols=['#e34948','#eb6834','#eda100','#008300','#2a78d6','#1f3d99','#8e5bd6'];
+var roots=[['C',0,0],['C♯',0,1],['D♭',1,-1],['D',1,0],['D♯',1,1],['E♭',2,-1],['E',2,0],['F',3,0],['F♯',3,1],['G♭',4,-1],['G',4,0],['G♯',4,1],['A♭',5,-1],['A',5,0],['A♯',5,1],['B♭',6,-1],['H',6,0]];
+var A='1 2 3 1 2 3 4 5',L='5 4 3 2 1 3 2 1',F1='2 3 4 1 2 3 1 2',F2='4 3 2 1 3 2 1 4',L3='3 2 1 4 3 2 1 3';
+var K=[['C',0,0,A,L],['G',4,0,A,L],['D',1,0,A,L],['A',5,0,A,L],['E',2,0,A,L],['H',6,0,A,'4 3 2 1 4 3 2 1'],['F♯',3,1,F1,F2],['G♭',4,-1,F1,F2],['D♭',1,-1,'2 3 1 2 3 4 1 2',L3],['A♭',5,-1,'3 4 1 2 3 1 2 3',L3],['E♭',2,-1,'3 1 2 3 4 1 2 3',L3],['B♭',6,-1,'4 1 2 3 1 2 3 4',L3],['F',3,0,'1 2 3 4 1 2 3 4',L],['A',5,0,A,L,1],['E',2,0,A,L,1],['H',6,0,A,'4 3 2 1 4 3 2 1',1],['F♯',3,1,'3 4 1 2 3 1 2 3',F2,1],['C♯',0,1,'3 4 1 2 3 1 2 3',L3,1],['G♯',4,1,'3 4 1 2 3 1 2 3',L3,1],['E♭',2,-1,'2 3 1 2 3 4 1 2',L3,1],['B♭',6,-1,'2 1 2 3 1 2 3 4','2 1 3 2 1 4 3 2',1],['F',3,0,'1 2 3 4 1 2 3 4',L,1],['C',0,0,A,L,1],['G',4,0,A,L,1],['D',1,0,A,L,1]];
+var T=[['dur','',[[2,4],[4,7]]],['mol (m)','m',[[2,3],[4,7]]],['dim','dim',[[2,3],[4,6]]],['aug','aug',[[2,4],[4,8]]],['sus2','sus2',[[1,2],[4,7]]],['sus4','sus4',[[3,5],[4,7]]],
+['6','6',[[2,4],[4,7],[5,9]]],['m6','m6',[[2,3],[4,7],[5,9]]],['6/9','6/9',[[2,4],[4,7],[5,9],[8,14]]],
+['maj7','maj7',[[2,4],[4,7],[6,11]]],['7','7',[[2,4],[4,7],[6,10]]],['m7','m7',[[2,3],[4,7],[6,10]]],['m(Maj7)','m(Maj7)',[[2,3],[4,7],[6,11]]],['m7♭5','m7♭5',[[2,3],[4,6],[6,10]]],['dim7','dim7',[[2,3],[4,6],[6,9]]],['7sus4','7sus4',[[3,5],[4,7],[6,10]]],
+['maj9','maj9',[[2,4],[4,7],[6,11],[8,14]]],['9','9',[[2,4],[4,7],[6,10],[8,14]]],['m9','m9',[[2,3],[4,7],[6,10],[8,14]]],['7♭9','7♭9',[[2,4],[4,7],[6,10],[8,13]]],['7♯9','7♯9',[[2,4],[4,7],[6,10],[8,15]]],['add9','add9',[[2,4],[4,7],[8,14]]],
+['maj7♯11','maj7♯11',[[2,4],[4,7],[6,11],[10,18]]],['7♯11','7♯11',[[2,4],[4,7],[6,10],[10,18]]],['11','11',[[2,4],[4,7],[6,10],[8,14],[10,17]]],['m11','m11',[[2,3],[4,7],[6,10],[8,14],[10,17]]],['13','13',[[2,4],[4,7],[6,10],[8,14],[12,21]]],['7♭13','7♭13',[[2,4],[4,7],[6,10],[12,20]]]];
+function $(i){return document.getElementById(i)}
+function acc(a){return a===0?'':a===1?'♯':a===-1?'♭':a===2?'♯♯':'♭♭'}
+function nm(l,a){return l===6&&a<0?'B'+acc(a):N[l]+acc(a)}
+function sp(R,s,m){var l=(R[1]+s)%7,t=((nat[R[1]]+R[2]+m)%12+12)%12;return{l:l,a:((t-nat[l])%12+18)%12-6,s:s}}
+function chip(x){return '<span class="n'+(x.h?' h':'')+'" style="--c:'+cols[x.l]+'">'+nm(x.l,x.a)+'</span>'}
+function tones(R,Ty){return [{l:R[1],a:R[2],s:0}].concat(Ty[2].map(function(v){return sp(R,v[0],v[1])}))}
+function rot(a,k){k=k%a.length;return a.slice(k).concat(a.slice(0,k))}
+function ix(s){for(var i=0;i<T.length;i++)if(T[i][1]===s)return i}
+var tab=0,ki=12,rs=$('root'),ts=$('type'),iv=$('inv');
+roots.forEach(function(x,i){rs.add(new Option(x[0],i))});
+T.forEach(function(x,i){ts.add(new Option(x[0],i))});
+rs.value=7;ts.value=ix('maj7');
+function fin(s){return '<span class="f">'+s+'</span>'}
+function ch(t,rn,sx){return sx.map(function(s,d){var n=(cm?[0,2,4,6]:[0,2,4]).map(function(o){return t[(d+o)%7]});return '<div class="r c"><span class="t">'+rn[d]+'</span><b class="w">'+nm(n[0].l,n[0].a)+s+'</b>'+n.map(chip).join('')+'</div>'}).join('')}
+function drawS(){
+var k=K[ki],m=k[5],S=m?[0,2,3,5,7,8,10,12]:[0,2,4,5,7,9,11,12],H=[0,2,3,5,7,8,11,12];
+var t=S.map(function(x,i){return sp(k,i,x)}),h7=H.map(function(x,i){return sp(k,i,x)});
+var fs=t.slice(0,7).filter(function(x){return x.a}),fo=fs.length?fs.length+' '+(fs[0].a>0?'♯':'♭')+': '+fs.map(function(x){return nm(x.l,x.a)}).join(' '):'ingen fortegn';
+var rn=m?['i','ii°','♭III','iv','v','♭VI','♭VII']:['I','ii','iii','IV','V','vi','vii°'];
+var sx=cm?(m?['m7','m7♭5','maj7','m7','m7','maj7','7']:['maj7','m7','m7','maj7','7','m7','m7♭5']):(m?['m','dim','','m','m','','']:['','m','m','','','m','dim']),w=cm?'7-akkorder':'treklange',sg='<div class="seg"><button'+(cm?'':' class="on"')+' onclick="cm=0;upd()">Treklange</button><button'+(cm?' class="on"':'')+' onclick="cm=1;upd()">Septimakkorder</button></div>';
+var o='<div class="card"><div class="big">'+k[0]+(m?'-mol':'-dur')+'</div><div class="sub">Fortegn: '+fo+'</div><div class="sub">'+(m?'Naturlig mol: halvtoner mellem trin 2–3 og 5–6. Harmonisk mol: 7. tone hæves, så der er halvtone 7–8 og 1½ tone mellem 6–7.':'Halvtoner mellem trin 3–4 og 7–8.')+' Fingre: 1 = tommel'+(m?' (samme for begge former)':'')+'. HH op, VH op fra grundtonen.</div><div class="g"><b>'+(m?'Nat.':'')+'</b>'+t.map(chip).join('')+(m?'<b>Harm.</b>'+h7.map(chip).join(''):'')+'<b>HH</b>'+k[3].split(' ').map(fin).join('')+'<b>VH</b>'+k[4].split(' ').map(fin).join('')+'</div></div>';
+o+='<div class="card">'+sg+'<div class="sub" style="margin:0 0 6px">Naturlige '+w+(m?' (naturlig mol)':'')+'</div>'+ch(t,rn,sx)+'</div>';
+if(m)o+='<div class="card"><div class="sub" style="margin:0 0 6px">'+w[0].toUpperCase()+w.slice(1)+' i harmonisk mol</div>'+ch(h7,['i','ii°','♭III+','iv','V','♭VI','vii°'],cm?['m(Maj7)','m7♭5','maj7♯5','m7','7','maj7','dim7']:['m','dim','aug','m','','','dim'])+'</div>';
+return o;
+}
+var op=-1,cm=0;
+function tg(j){op=op===j?-1:j;upd()}
+function drawC(){
+var R=roots[+rs.value],prev=null,d='',lbl={2:'tersen',4:'kvinten',6:'septimen'},il=['Grundstilling','1. omvending','2. omvending','3. omvending'];
+var h='<div class="card"><div class="big">'+R[0]+': de fem 7-akkorder</div><div class="sub">Udfyldt chip = tonen der ændres fra rækken over. Tryk på omv. ved en akkord for at se dens omvendinger.</div>';
+['maj7','7','m7','m7♭5','dim7'].forEach(function(s,j){
+var tn=tones(R,T[ix(s)]),hint='Start: stor septim';
+if(prev)for(var i=1;i<4;i++)if(tn[i].l!==prev[i].l||tn[i].a!==prev[i].a){tn[i].h=1;hint=lbl[tn[i].s]+' sænkes: '+nm(prev[i].l,prev[i].a)+' → '+nm(tn[i].l,tn[i].a)}
+prev=tn;
+if(op<0)h+='<div class="r s"><span class="t">'+R[0]+s+'</span>'+tn.map(chip).join('')+'<button class="ar" onclick="tg('+j+')">omv. ▸</button><div class="hint">'+hint+'</div></div>';
+else if(op===j)d='<div class="card"><button class="bk" onclick="tg('+j+')">← Alle 7-akkorder</button><div class="big">'+R[0]+s+'</div><div class="sub">'+hint+'</div>'+il.map(function(l,k){return '<div class="il"><i>'+l+'</i>'+rot(tn,k).map(chip).join('')+'</div>'}).join('')+'</div>';
+});
+return op<0?h+'</div>':d;
+}
+function drawO(){
+var R=roots[+rs.value],Ty=T[+ts.value],tn=tones(R,Ty),k=+iv.value;
+var bars=tn.map(function(f){var h=1+f.a*.5,px=h===0?3:Math.round(h*64);return '<div class="b"><div class="bar" style="height:'+px+'px;background:'+cols[f.l]+'"></div><div class="bl" style="bottom:'+(px+3)+'px">'+nm(f.l,f.a)+'</div></div>'}).join('');
+return '<div class="card"><div class="big">'+R[0]+Ty[1]+'</div><div class="sub">Fra bunden'+(k?' ('+k+'. omvending)':'')+':</div><div>'+rot(tn,k).map(chip).join('')+'</div><div id="plot"><div class="dash"></div>'+bars+'</div><div id="tk">'+tn.map(function(x){return '<div>'+(x.s?x.s+1:'grund')+'</div>'}).join('')+'</div><div class="note">Søjlerne står i akkordens rækkefølge. Farve = tonenavn. Højde: ♭ lav · naturlig midt (stiplet) · ♯ høj. H er det danske navn for B (engelsk).</div></div>';
+}
+function upd(){$('out').innerHTML=tab===0?drawS():tab===1?drawC():drawO()}
+function show(n){tab=n;op=-1;var b=document.querySelectorAll('.tabs button');for(var i=0;i<3;i++)b[i].className=i===n?'on':'';
+$('ctl').style.display=n?'flex':'none';$('ct').style.display=n===2?'':'none';$('ci').style.display=n===2?'':'none';$('keys').style.display=n?'none':'grid';upd()}
+document.querySelectorAll('.tabs button').forEach(function(b,i){b.onclick=function(){show(i)}});
+K.forEach(function(k,i){var b=document.createElement('button');b.textContent=k[0]+(k[5]?'m':'');b.onclick=function(){ki=i;mark();upd()};$('keys').appendChild(b)});
+function mark(){var b=$('keys').children;for(var i=0;i<b.length;i++)b[i].className=i===ki?'on':''}
+rs.onchange=ts.onchange=iv.onchange=upd;
+mark();show(0);
+</script>
+</body>
+</html>
