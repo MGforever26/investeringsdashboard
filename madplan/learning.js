@@ -341,8 +341,10 @@
   if(typeof generatePlan==='function'){
     const oldGeneratePlan=generatePlan;
     generatePlan=function(){
+      const bootstrap=arguments.length>0&&arguments[0]===false;
       const before=(plan||[]).slice();
       const out=oldGeneratePlan.apply(this,arguments);
+      if(bootstrap)return out;
       try{
         record('plan_generate',{
           before:before.map(rid=>{const r=byId(rid);return r?r.name:rid;}),

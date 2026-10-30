@@ -453,17 +453,22 @@
     saveRemoteNow(true);
   };
 
-  try{restoreLocalState();buildShopping();renderAll();}catch(e){}
-
-  const urlWeek=new URLSearchParams(location.search).get('week');
-  if(urlWeek){
-    activeWeek=Object.assign({},activeWeek,{id:urlWeek});
-    saveWeekMeta();
-    loadRemote(urlWeek,true);
-  }else{
-    useCurrentPlanId();
-    loadRemote(CURRENT_ID,true);
+  async function bootstrapSharedWeek(){
+    // Vent på opskrifter og initialisering før lokal/gemens restaurering.
+    // Ellers kan en ny installation gemme en tilfældig uge oven i den fælles.
+    try{if(window.madplanInitReady)await window.madplanInitReady;}catch(e){}
+    try{restoreLocalState();buildShopping();renderAll();}catch(e){}
+    const urlWeek=new URLSearchParams(location.search).get('week');
+    if(urlWeek){
+      activeWeek=Object.assign({},activeWeek,{id:urlWeek});
+      saveWeekMeta();
+      loadRemote(urlWeek,true);
+    }else{
+      useCurrentPlanId();
+      loadRemote(CURRENT_ID,true);
+    }
   }
+  bootstrapSharedWeek();
 
   // Also refresh while both phones remain open. Focus/visibility still checks immediately.
   setInterval(()=>{
