@@ -26,6 +26,20 @@
   }
   if(!API) return;
   let syncing=false,timer=null,dirty=false,sending=false,retryCount=0;
+  let remoteAppliedVersion=null;
+  const PENDING_KEY='madplan_pending_sync_v1';
+  function pendingLocal(){
+    try{
+      const v=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');
+      return !!(v&&v.version&&activeWeek&&v.version===activeWeek.changedAt);
+    }catch(e){return false;}
+  }
+  function clearPending(version){
+    try{
+      const v=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');
+      if(!v||!version||v.version===version)localStorage.removeItem(PENDING_KEY);
+    }catch(e){}
+  }
   let retryTimer=null;
 
   function currentLabel(){
@@ -65,6 +79,7 @@
       activeWeek=Object.assign({},activeWeek||{}, {changedAt:now, updatedAt:now,lastEditor:deviceEditor()});
       dirty=true;
       retryCount=0;
+      try{localStorage.setItem(PENDING_KEY,JSON.stringify({version:now,weekId:activeWeek.id||CURRENT_ID}));}catch(e){}
       saveWeekMeta();
       showSyncStatus('Synkroniserer…');
       refreshWeekHeader();
@@ -243,6 +258,8 @@
       if(activeWeek.id===weekId&&activeWeek.changedAt===version){
         dirty=false;
         retryCount=0;
+        remoteAppliedVersion=version;
+        clearPending(version);
         markSaved(confirmed.updatedAt||new Date().toISOString(),confirmed.lastEditor||editor);
         showSyncStatus('Synkroniseret');
       }
@@ -343,21 +360,19 @@
       let remoteChanged=remoteMeta.changedAt||remoteMeta.updatedAt||data.week.version||data.week.updatedAt||null;
       let localChanged=(activeWeek&&activeWeek.changedAt)||null;
       // En indledende tvungen hentning må ikke overskrive en nyere lokal uge.
-      if(weekId===CURRENT_ID && olderThanLastReset(remoteMeta)){
+      // Et lokalt tidsstempel uden en uafsendt ændring er ikke bevis
+      // på, at planen er indlæst. Hent serverens uge ved første åbning.
+      if(weekId===CURRENT_ID && pendingLocal() && (
+        olderThanLastReset(remoteMeta) ||
+        (localChanged&&remoteChanged&&new Date(remoteChanged)<new Date(localChanged))
+      )){
+        dirty=true;
+        showSyncStatus('Lokale ændringer afventer synkronisering');
         saveRemoteNow(true);
         return;
       }
-      if(localChanged && remoteChanged && new Date(remoteChanged)<new Date(localChanged)){
-        if(weekId===CURRENT_ID){
-          // Genforsøg ældre lokale ændringer, der tidligere blev markeret
-          // som gemt uden serverkvittering.
-          dirty=true;
-          showSyncStatus('Nyere lokale ændringer afventer synkronisering');
-          saveRemoteNow(true);
-        }
-        return;
-      }
-      if(localChanged && remoteChanged && new Date(remoteChanged).getTime()===new Date(localChanged).getTime()){
+      if(remoteAppliedVersion===remoteChanged && localChanged && remoteChanged &&
+         new Date(remoteChanged).getTime()===new Date(localChanged).getTime()){
         activeWeek.lastEditor=data.week.lastEditor||remoteMeta.lastEditor||activeWeek.lastEditor;
         activeWeek.savedAt=data.week.updatedAt||remoteMeta.savedAt||activeWeek.savedAt;
         saveWeekMeta();
@@ -395,6 +410,8 @@
       writeLocalState();
       renderAll();
       syncing=false;
+      remoteAppliedVersion=remoteChanged;
+      clearPending(remoteChanged);
       showSyncStatus('Synkroniseret');
       if(repairedSuggestions)saveSession();
     }catch(e){
@@ -406,6 +423,7 @@
   if(typeof saveSession==='function'){
     const oldSave=saveSession;
     saveSession=function(touch=true){
+      if(window.madplanBootstrapping)return;
       oldSave(touch);
       writeLocalState();
       if(touch!==false) saveRemoteSoon();
@@ -454,18 +472,27 @@
   };
 
   async function bootstrapSharedWeek(){
-    // Vent på opskrifter og initialisering før lokal/gemens restaurering.
-    // Ellers kan en ny installation gemme en tilfældig uge oven i den fælles.
-    try{if(window.madplanInitReady)await window.madplanInitReady;}catch(e){}
-    try{restoreLocalState();buildShopping();renderAll();}catch(e){}
-    const urlWeek=new URLSearchParams(location.search).get('week');
-    if(urlWeek){
-      activeWeek=Object.assign({},activeWeek,{id:urlWeek});
-      saveWeekMeta();
-      loadRemote(urlWeek,true);
-    }else{
-      useCurrentPlanId();
-      loadRemote(CURRENT_ID,true);
+    try{
+      if(window.madplanInitReady)await window.madplanInitReady;
+      try{restoreLocalState();buildShopping();renderAll();}catch(e){}
+      const urlWeek=new URLSearchParams(location.search).get('week');
+      if(urlWeek){
+        activeWeek=Object.assign({},activeWeek,{id:urlWeek});
+        saveWeekMeta();
+        await loadRemote(urlWeek,true);
+      }else{
+        useCurrentPlanId();
+        await loadRemote(CURRENT_ID,true);
+      }
+    }catch(e){
+      showSyncStatus('Kunne ikke hente den fælles madplan');
+    }finally{
+      window.madplanBootstrapping=false;
+      try{
+        if(!plan.length)generatePlan(false);
+        saveSession(false);
+        renderAll();
+      }catch(e){}
     }
   }
   bootstrapSharedWeek();
