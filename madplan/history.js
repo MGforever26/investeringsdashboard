@@ -554,9 +554,7 @@
       box.className='card no-print';
       box.style.padding='13px 16px';
       box.style.marginBottom='14px';
-      const note=state.cold
-        ?'Når der er mere historik, fremhæver vi retter, I ofte vælger, men ikke har fået længe. Indtil da varierer forslagene fra uge til uge.'
-        :'Retter, I ofte vælger, men ikke har fået i et stykke tid. Forslagene bygger på jeres tidligere madplaner og fornyes ved en ny uge.';
+      const note='Retter, vi ofte vælger, men ikke har fået i et stykke tid. Forslagene bygger på vores tidligere madplaner.';
 
       const chosen=suggested.find(r=>r.id===selectedSuggestionId);
       const chooser=chosen
