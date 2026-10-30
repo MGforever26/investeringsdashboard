@@ -1,6 +1,6 @@
 (function(){
   const HISTORY_KEY='madplan_meal_history_v1';
-  const MAX_WEEKS=30;
+  const MAX_WEEKS=520;
   const DAY_MS=86400000;
   let mealHistory=loadHistory();
 
@@ -555,8 +555,8 @@
       box.style.padding='13px 16px';
       box.style.marginBottom='14px';
       const note=state.cold
-        ?'Forslagene varierer fra uge til uge og bliver mere personlige, efterhånden som vi samler historik om jeres valg. De samme forslag ligger øverst i retvælgerne nedenfor.'
-        :'Baseret på hvad vi plejer at vælge, og hvor længe siden retterne sidst var på planen. De samme forslag ligger øverst i retvælgerne nedenfor.';
+        ?'Når der er mere historik, fremhæver vi retter, I ofte vælger, men ikke har fået længe. Indtil da varierer forslagene fra uge til uge.'
+        :'Retter, I ofte vælger, men ikke har fået i et stykke tid. Forslagene bygger på jeres tidligere madplaner og fornyes ved en ny uge.';
 
       const chosen=suggested.find(r=>r.id===selectedSuggestionId);
       const chooser=chosen
@@ -609,6 +609,7 @@
     },
     suggestions:()=>suggestionIds().map(x=>{const r=(recipes||[]).find(y=>y.id===x);return r?r.name:x;}),
     ensureAlternativeSuggestions,
+    mergeArchive:entries=>mergeHistory(entries),
     currentWeekEligible:()=>credibleWeek(activeWeek||{},currentRecipeNames(),new Date().toISOString())
   };
 })();

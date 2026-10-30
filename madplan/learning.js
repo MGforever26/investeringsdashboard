@@ -1,6 +1,6 @@
 (function(){
   const KEY='madplan_learning_v1';
-  const MAX_EVENTS=900;
+  const MAX_EVENTS=10000;
   const DISMISS_DAYS=28;
   let learning=loadLocal();
   let applying=false;
@@ -902,6 +902,7 @@
   window.madplanLearning={
     events:()=>learning.events.slice(),
     rules:()=>learning.rules.slice(),
+    mergeArchive:events=>mergeLearning({events}),
     patterns:()=>allPatterns(),
     preferenceMultiplier:name=>preferenceMultiplier(name),
     counts:()=>({
