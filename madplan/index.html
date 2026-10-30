@@ -3,56 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#800020">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Madplan">
-<title>Madplan</title>
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
-<style>
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#F7F5F2;color:#1f1f1f;min-height:100vh;display:grid;place-items:center;margin:0;padding:24px}.card{max-width:560px;background:#fff;border:1px solid #E7E2DC;border-radius:22px;padding:24px;box-shadow:0 16px 40px rgba(41,24,18,.07)}a{color:#800020;font-weight:700}.muted{color:#666;font-size:14px}
-</style>
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="refresh" content="0;url=https://mgforever26.github.io/madplan/">
+<title>Madplan er flyttet</title>
 </head>
 <body>
-<div class="card">
-<h1>Madplan åbner…</h1>
-<p class="muted">Hvis appen ikke åbner automatisk, så genindlæs siden.</p>
-</div>
+<p>Madplan er flyttet til <a href="https://mgforever26.github.io/madplan/">den selvstændige madplan</a>.</p>
 <script>
-(async function(){
-  var src='https://raw.githubusercontent.com/MGforever26/madplan/main/index.html?v=20261019-test-week-learning-v1';
-  try{
-    var res=await fetch(src,{cache:'no-store'});
-    if(!res.ok) throw new Error('Kunne ikke hente appen');
-    var html=await res.text();
-    var patches=[
-      ['data-tab="print">PDF</button>','data-tab="print">Indkøbsliste</button>'],
-      ['onclick="setTab(\'print\')">Vis/PDF →','onclick="setTab(\'print\')">Indkøbsliste →'],
-      ['onclick="setTab(\'list\')">Gå til indkøbsliste →','onclick="setTab(\'list\')">Gå til indkøb →'],
-      ['<h2>Visning og PDF</h2><p class="sub">Download PDF, åbn PDF eller del den aktuelle uge som link.</p>','<h2>PDF og deling</h2><p class="sub">Download PDF, åbn PDF eller del den aktuelle uge som link.</p>'],
-      ['onclick="buildShopping();saveSession();renderAll()">Nulstil listen','onclick="buildShopping({keepManual:false});saveSession();renderAll()">Nulstil indkøbsliste'],
-      ['el.innerHTML=`<div class="card"><h2>Ugens madplan','el.innerHTML=weekTop()+`<div class="card"><h2>Ugens madplan']
-    ];
-    patches.forEach(function(p){html=html.replace(p[0],p[1]);});
-    var helper = `
-function isoWeek(d=new Date()){d=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));let day=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-day);let y=d.getUTCFullYear(),start=new Date(Date.UTC(y,0,1));let w=Math.ceil((((d-start)/86400000)+1)/7);return {y,w}}
-function newWeekMeta(){let w=isoWeek();return {id:'uge-'+w.y+'-'+String(w.w).padStart(2,'0')+'-'+id(),label:'Uge '+w.w,changedAt:null,updatedAt:null,savedAt:null,lastEditor:null}}
-let activeWeek=store.get('madplan_week_meta_v1',null)||newWeekMeta();
-function touchWeek(){let now=new Date().toISOString();activeWeek.changedAt=now;activeWeek.updatedAt=now;store.set('madplan_week_meta_v1',activeWeek)}
-function deviceName(){return (localStorage.getItem('madplan_editor_name')||'').trim()}
-function ensureDeviceName(){try{if(deviceName()||localStorage.getItem('madplan_editor_name_skipped'))return;let name=prompt('Hvem bruger denne enhed? Navnet bruges kun til at vise, hvem der senest ændrede madplanen. Fx Michael eller Louise.','');if(name&&String(name).trim()){localStorage.setItem('madplan_editor_name',String(name).trim())}else{localStorage.setItem('madplan_editor_name_skipped','1')}if(typeof renderAll==='function')renderAll()}catch(e){}}
-setTimeout(ensureDeviceName,1200);
-function formatDateTime(x){try{return x?new Date(x).toLocaleString('da-DK',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'ikke ændret endnu'}catch{return 'ukendt'}}
-function weekTop(){let changed=activeWeek.changedAt||activeWeek.updatedAt||null;let editor=(activeWeek.lastEditor&&activeWeek.lastEditor!=='app')?' af '+esc(activeWeek.lastEditor):'';let status=(window.madplanSyncStatus&&window.madplanSyncStatus.label)||'';return '<div class="card no-print"><h2>'+esc(activeWeek.label||'Uge')+'</h2><p class="sub" data-week-last-change>Senest ændret '+formatDateTime(changed)+editor+'</p><p class="sub" data-week-sync-status style="margin-top:5px">'+esc(status)+'</p><div class="row" style="margin-top:12px"><button class="btn secondary" onclick="startNewWeek()">Start ny uge</button></div></div>'}
-function sourceLabel(s){s=s==='ekstra'?'manuelt':s;return s==='ret'?'Ret':s==='standard'?'Standard':s==='manuelt'?'Manuelt':cap(s||'Manuelt')}
-`;
-    html=html.replace('const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};','const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){localStorage.setItem(k,JSON.stringify(v))}};'+helper);
-    html=html.replace('function saveSession(){sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}','function saveSession(touch=true){if(touch!==false)touchWeek();else store.set(\'madplan_week_meta_v1\',activeWeek);sessionStorage.setItem(\'madplan_state_v1\',JSON.stringify(stateObj()))}');
-    var printFooterPatch='<scr'+'ipt>(function(){try{var oldRenderPrint=renderPrint;renderPrint=function(){oldRenderPrint();var p=document.querySelector("#print");if(!p)return;var card=p.querySelector(".card.no-print");if(card){var h=card.querySelector("h2");if(h)h.textContent="PDF og deling";var sub=card.querySelector(".sub");if(sub)sub.textContent="Download PDF, åbn PDF eller del den aktuelle uge som link.";p.appendChild(card);}};renderPrint();}catch(e){}})();</scr'+'ipt>';
-    html=html.replace('</body>',printFooterPatch+'<scr'+'ipt src="shared-sync.js?v=21"></scr'+'ipt><scr'+'ipt src="category-fix.js?v=8"></scr'+'ipt><scr'+'ipt src="new-week-fix.js?v=2"></scr'+'ipt><scr'+'ipt src="quantity-fix.js?v=4"></scr'+'ipt><scr'+'ipt src="final-list-merge.js?v=1"></scr'+'ipt><scr'+'ipt src="history.js?v=13"></scr'+'ipt><scr'+'ipt src="learning.js?v=5"></scr'+'ipt><scr'+'ipt src="ingredient-quantity.js?v=1"></scr'+'ipt></body>');
-    document.open();document.write(html);document.close();
-  }catch(e){document.body.innerHTML='<div class="card"><h1>Madplan kunne ikke åbnes</h1><p>Prøv at genindlæse siden.</p><p class="muted">Fejl: '+String(e.message||e)+'</p></div>'}
+(function(){
+  var target=new URL('https://mgforever26.github.io/madplan/');
+  target.search=location.search;
+  target.hash=location.hash;
+  location.replace(target.href);
 })();
 </script>
 </body>
